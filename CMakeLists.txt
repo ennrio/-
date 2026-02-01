@@ -11,6 +11,10 @@ qt_add_executable(asudd
     mainwindow.cpp
     mainwindow.h
     mainwindow.ui
+    vehicle.h vehicle.cpp
+    vehicleitem.h vehicleitem.cpp
+    simulationview.h simulationview.cpp
+    roadgraph.h roadgraph.cpp
 )
 
 target_link_libraries(asudd
