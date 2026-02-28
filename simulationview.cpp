@@ -3,6 +3,14 @@
 #include <QPen>
 #include <QBrush>
 #include <cmath>
+#include <QFile>
+#include <QXmlStreamReader>
+#include <QGraphicsPathItem>
+#include <QPainterPath>
+#include <QColor>
+#include <QtMath>
+
+
 
 SimulationView::SimulationView(QWidget *parent)
     : QGraphicsView(parent)
@@ -150,6 +158,44 @@ void SimulationView::stopSimulation()
     qDebug() << "Simulation stopped";
 }
 
+void SimulationView::drawRoad(long long fromId, long long toId, const QString &type)
+{
+    if (!m_nodePositions.contains(fromId) || !m_nodePositions.contains(toId))
+        return;
+
+    QGraphicsLineItem *line = m_scene->addLine(
+        QLineF(m_nodePositions[fromId], m_nodePositions[toId])
+        );
+
+    // Цвет по типу дороги
+    if (type == "motorway") line->setPen(QPen(Qt::darkBlue, 3));
+    else if (type == "trunk") line->setPen(QPen(Qt::blue, 2.5));
+    else if (type == "primary") line->setPen(QPen(Qt::green, 2));
+    else line->setPen(QPen(Qt::gray, 1.5));
+}
+
+double SimulationView::calculateDistance(double lat1, double lon1, double lat2, double lon2)
+{
+    const double R = 6371000; // радиус Земли в метрах
+    double dLat = qDegreesToRadians(lat2 - lat1);
+    double dLon = qDegreesToRadians(lon2 - lon1);
+    double a = sin(dLat/2) * sin(dLat/2) +
+               cos(qDegreesToRadians(lat1)) * cos(qDegreesToRadians(lat2)) *
+                   sin(dLon/2) * sin(dLon/2);
+    return R * 2 * atan2(sqrt(a), sqrt(1-a));
+}
+
+void SimulationView::wheelEvent(QWheelEvent *event)
+{
+    double scaleFactor = 1.15;
+    if (event->angleDelta().y() > 0) {
+        scale(scaleFactor, scaleFactor);
+    } else {
+        scale(1.0 / scaleFactor, 1.0 / scaleFactor);
+    }
+    event->accept();
+}
+
 void SimulationView::updateSimulation()
 {
     // Вычисляем дельту времени
@@ -172,4 +218,216 @@ void SimulationView::updateVehicleGraphics()
     for (auto it = m_vehicleItems.begin(); it != m_vehicleItems.end(); ++it) {
         it.value()->update();
     }
+}
+
+QPointF SimulationView::latLonToScene(double lat, double lon) const
+{
+    const double centerLat = 59.9386;
+    const double centerLon = 30.3141;
+    const double metersPerPixel = 0.5; // 1 пиксель = 0.5 метра (для района 2×2 км)
+
+    // Расстояние в метрах от центра
+    double dx = (lon - centerLon) * 111320.0 * cos(qDegreesToRadians(centerLat));
+    double dy = (lat - centerLat) * 110540.0;
+
+    // Конвертируем метры в пиксели + центрируем сцену
+    return QPointF(dx / metersPerPixel, -dy / metersPerPixel);
+}
+
+void SimulationView::parseOSMFile(const QString &filename)
+{
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Cannot open OSM file:" << filename << file.errorString();
+        return;
+    }
+
+    QXmlStreamReader xml(&file);
+    QMap<long long, QPointF> tempNodes; // Временное хранилище узлов
+    QList<QPair<QList<long long>, QString>> waysToDraw; // (список узлов, тип дороги)
+
+    // Этап 1: Парсим все узлы
+    while (!xml.atEnd() && !xml.hasError()) {
+        xml.readNext();
+        if (xml.isStartElement() && xml.name() == "node") {
+            long long id = xml.attributes().value("id").toLongLong();
+            double lat = xml.attributes().value("lat").toDouble();
+            double lon = xml.attributes().value("lon").toDouble();
+            tempNodes[id] = QPointF(lat, lon);
+
+            // Пропускаем содержимое узла
+            while (!(xml.isEndElement() && xml.name() == "node")) {
+                xml.readNext();
+            }
+        }
+    }
+
+    if (xml.hasError()) {
+        qWarning() << "XML error during node parsing:" << xml.errorString();
+        return;
+    }
+
+    file.seek(0);
+    xml.clear();
+    xml.setDevice(&file);
+
+    // Этап 2: Парсим пути (дороги)
+    while (!xml.atEnd() && !xml.hasError()) {
+        xml.readNext();
+        if (xml.isStartElement() && xml.name() == "way") {
+            long long wayId = xml.attributes().value("id").toLongLong();
+            QList<long long> nodeRefs;
+            QString highwayType;
+            bool isRoad = false;
+
+            while (!(xml.isEndElement() && xml.name() == "way")) {
+                xml.readNext();
+                if (xml.isStartElement()) {
+                    if (xml.name() == "nd") {
+                        nodeRefs.append(xml.attributes().value("ref").toLongLong());
+                    } else if (xml.name() == "tag") {
+                        QString key = xml.attributes().value("k").toString();
+                        QString value = xml.attributes().value("v").toString();
+                        if (key == "highway") {
+                            highwayType = value;
+                            // Фильтруем только автомобильные дороги
+                            if (!value.contains("footway") &&
+                                !value.contains("path") &&
+                                !value.contains("cycleway") &&
+                                !value.contains("steps")) {
+                                isRoad = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isRoad && nodeRefs.size() >= 2) {
+                waysToDraw.append(qMakePair(nodeRefs, highwayType));
+            }
+        }
+    }
+
+    if (xml.hasError()) {
+        qWarning() << "XML error during way parsing:" << xml.errorString();
+        return;
+    }
+
+    // Этап 3: Добавляем узлы в граф и сцену
+    int internalIdCounter = 1;
+    for (auto it = tempNodes.begin(); it != tempNodes.end(); ++it) {
+        long long osmId = it.key();
+        double lat = it.value().x();
+        double lon = it.value().y();
+
+        // Конвертируем в координаты сцены
+        QPointF scenePos = latLonToScene(lat, lon);
+        m_osmNodePositions[osmId] = scenePos;
+
+        // Маппинг OSM ID → внутренний ID
+        m_osmToInternalId[osmId] = internalIdCounter;
+
+        // Добавляем узел в граф (только если он используется в дорогах)
+        for (const auto &way : waysToDraw) {
+            if (way.first.contains(osmId)) {
+                addNode(internalIdCounter, scenePos.x(), scenePos.y());
+                break;
+            }
+        }
+
+        internalIdCounter++;
+    }
+
+    if (!m_osmNodePositions.isEmpty()) {
+        double minX = std::numeric_limits<double>::max();
+        double maxX = std::numeric_limits<double>::lowest();
+        double minY = std::numeric_limits<double>::max();
+        double maxY = std::numeric_limits<double>::lowest();
+
+        for (const QPointF &pos : m_osmNodePositions) {
+            minX = qMin(minX, pos.x());
+            maxX = qMax(maxX, pos.x());
+        qDebug() << "Centered on:" << QPointF((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+        }
+    }
+
+    // Этап 4: Рисуем дороги
+    int edgeId = 1;
+    for (const auto &way : waysToDraw) {
+        const QList<long long> &nodeRefs = way.first;
+        const QString &highwayType = way.second;
+
+        for (int i = 0; i < nodeRefs.size() - 1; ++i) {
+            long long fromOsmId = nodeRefs[i];
+            long long toOsmId = nodeRefs[i + 1];
+
+            if (m_osmToInternalId.contains(fromOsmId) && m_osmToInternalId.contains(toOsmId)) {
+                int fromId = m_osmToInternalId[fromOsmId];
+                int toId = m_osmToInternalId[toOsmId];
+
+                // Рассчитываем длину сегмента
+                QPointF fromPos = m_osmNodePositions[fromOsmId];
+                QPointF toPos = m_osmNodePositions[toOsmId];
+                double length = qSqrt(qPow(toPos.x() - fromPos.x(), 2) +
+                                      qPow(toPos.y() - fromPos.y(), 2));
+
+                // Добавляем ребро в граф
+                addEdge(edgeId++, fromId, toId, length);
+            }
+        }
+
+        // Визуализируем всю дорогу целиком (для красоты)
+        drawOSMRoad(nodeRefs, highwayType);
+    }
+}
+
+void SimulationView::drawOSMRoad(const QList<long long> &nodeRefs, const QString &highwayType)
+{
+    if (nodeRefs.size() < 2) return;
+
+    // Создаём polyline для всей дороги
+    QPolygonF polygon;
+    for (long long nodeId : nodeRefs) {
+        if (m_osmNodePositions.contains(nodeId)) {
+            polygon.append(m_osmNodePositions[nodeId]);
+        }
+    }
+
+    if (polygon.size() < 2) return;
+
+    QGraphicsPathItem *pathItem = new QGraphicsPathItem();
+    QPainterPath path;
+    path.addPolygon(polygon);
+    pathItem->setPath(path);
+
+    // Цвет и толщина по типу дороги
+    QPen pen;
+    if (highwayType == "motorway" || highwayType == "trunk") {
+        pen = QPen(QColor(0, 64, 128), 4); // Тёмно-синий
+    } else if (highwayType == "primary") {
+        pen = QPen(QColor(0, 128, 0), 3);  // Зелёный
+    } else if (highwayType == "secondary") {
+        pen = QPen(QColor(128, 128, 0), 2.5); // Жёлтый
+    } else if (highwayType == "tertiary") {
+        pen = QPen(QColor(192, 192, 192), 2); // Серый
+    } else {
+        pen = QPen(QColor(220, 220, 220), 1.5); // Светло-серый
+    }
+
+    pathItem->setPen(pen);
+    pathItem->setZValue(0);
+    m_scene->addItem(pathItem);
+}
+
+void SimulationView::loadOSM(const QString &filename)
+{
+    qDebug() << "Loading OSM file:" << filename;
+    parseOSMFile(filename);
+    qDebug() << "OSM loading completed. Nodes:" << m_osmNodePositions.size()
+             << "Roads drawn:" << m_edgeItems.size();
+}
+
+QPointF SimulationView::convertLatLon(double lat, double lon) const
+{
+    return latLonToScene(lat, lon);
 }

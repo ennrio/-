@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QWheelEvent>
 #include "roadgraph.h"
 #include "vehicle.h"
 #include "vehicleitem.h"
@@ -24,6 +25,13 @@ public:
     void startSimulation();
     void stopSimulation();
     void setSimulationSpeed(double factor) { m_timeFactor = factor; }
+    void drawRoad(long long fromId, long long toId, const QString &type);
+    double calculateDistance(double lat1, double lon1, double lat2, double lon2);
+    void loadOSM(const QString &filename);
+    QPointF convertLatLon(double lat, double lon) const;
+
+protected:
+    void wheelEvent(QWheelEvent *event) override;
 
 private slots:
     void updateSimulation();
@@ -34,6 +42,9 @@ private:
     QMap<int, QGraphicsLineItem*> m_edgeItems;
     QMap<int, Vehicle*> m_vehicles;           // Логика транспортных средств
     QMap<int, VehicleItem*> m_vehicleItems;   // Графические элементы
+    QMap<long long, QPointF> m_nodePositions; // кэш позиций узлов в сцене
+    QMap<long long, int> m_osmToInternalId;      // Маппинг: OSM ID → внутренний ID
+    QMap<long long, QPointF> m_osmNodePositions;
 
     RoadGraph m_roadGraph;
     QTimer m_simulationTimer;
@@ -44,6 +55,11 @@ private:
     void drawRoadGraph();
     QPointF getNodePosition(int nodeId) const;
     void updateVehicleGraphics();
+    QPointF latLonToScene(double lat, double lon) const;
+
+    // Вспомогательные методы парсинга
+    void parseOSMFile(const QString &filename);
+    void drawOSMRoad(const QList<long long> &nodeRefs, const QString &highwayType);
 };
 
 #endif // SIMULATIONVIEW_H

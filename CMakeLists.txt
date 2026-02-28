@@ -15,6 +15,7 @@ qt_add_executable(asudd
     vehicleitem.h vehicleitem.cpp
     simulationview.h simulationview.cpp
     roadgraph.h roadgraph.cpp
+    osmparser.h osmparser.cpp
 )
 
 target_link_libraries(asudd
