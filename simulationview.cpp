@@ -33,6 +33,22 @@ SimulationView::SimulationView(QWidget *parent)
     setSceneRect(-100, -100, 2000, 2000);
 }
 
+void SimulationView::show()
+{
+    QGraphicsView::show();
+    #if defined(Q_OS_WIN)
+        setupWindowsSpecific();
+    #elif defined(Q_OS_LINUX)
+        setupLinuxSpecific();
+    #endif
+
+    if (m_scene) {
+        m_scene->update(); // Обновить всю сцену
+    }
+    this->viewport()->update();
+}
+
+
 void SimulationView::addNode(int id, double x, double y)
 {
     // Добавляем в граф
@@ -137,6 +153,16 @@ void SimulationView::setVehicleRoute(int vehicleId, const QList<int>& nodeIds)
 
     qDebug() << "Route set for vehicle" << vehicleId << "with" << routePoints.size() << "points";
     qDebug() << "Path nodes:" << path;
+}
+
+void SimulationView::setupWindowsSpecific()
+{
+    this->loadOSM("C:\\Users\\egor\\all\\learning\\6sem\\asud\\graphs\\center.osm");
+}
+
+void SimulationView::setupLinuxSpecific()
+{
+    this->loadOSM("/home/egor/all/study/6sem/ASUDD/center.osm");
 }
 
 QPointF SimulationView::getNodePosition(int nodeId) const

@@ -17,10 +17,16 @@ class SimulationView : public QGraphicsView
 public:
     SimulationView(QWidget *parent = nullptr);
 
+    void show();
     void addNode(int id, double x, double y);
     void addEdge(int id, int from, int to, double length);
     void addVehicle(int id, const QPointF& startPosition);
     void setVehicleRoute(int vehicleId, const QList<int>& nodeIds);
+
+
+    //условная компиляция
+    void setupWindowsSpecific();
+    void setupLinuxSpecific();
 
     void startSimulation();
     void stopSimulation();
