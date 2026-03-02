@@ -11,6 +11,13 @@
 #include "vehicle.h"
 #include "vehicleitem.h"
 
+struct TrafficLight {
+    int id;
+    QPointF position;
+    QString direction; // "forward", "backward", "all"
+    bool isPedestrian;
+};
+
 class SimulationView : public QGraphicsView
 {
     Q_OBJECT
@@ -51,6 +58,7 @@ private:
     QMap<long long, QPointF> m_nodePositions; // кэш позиций узлов в сцене
     QMap<long long, int> m_osmToInternalId;      // Маппинг: OSM ID → внутренний ID
     QMap<long long, QPointF> m_osmNodePositions;
+    QMap<int, TrafficLight> m_trafficLights; // Кэш светофоров
 
     RoadGraph m_roadGraph;
     QTimer m_simulationTimer;
