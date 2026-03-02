@@ -9,6 +9,7 @@
 #include <QPainterPath>
 #include <QColor>
 #include <QtMath>
+#include <QStringView>
 
 
 
@@ -17,6 +18,9 @@ SimulationView::SimulationView(QWidget *parent)
     , m_scene(new QGraphicsScene(this))
     , m_timeFactor(1.0)
     , m_lastUpdateTime(0)
+    , m_isLoading(false)
+    , m_currentPhase(LoadPhase::ParsingNodes)
+    , m_internalIdCounter(1)
 {
     setScene(m_scene);
     setRenderHint(QPainter::Antialiasing);
@@ -37,6 +41,7 @@ SimulationView::SimulationView(QWidget *parent)
 void SimulationView::show()
 {
     QGraphicsView::show();
+    setupWindowsSpecific();
     #if defined(Q_OS_WIN)
         setupWindowsSpecific();
     #elif defined(Q_OS_LINUX)
@@ -493,10 +498,230 @@ void SimulationView::drawOSMRoad(const QList<long long> &nodeRefs, const QString
     m_scene->addItem(pathItem);
 }
 
+void SimulationView::startStreamingLoad(const QString &filename)
+{
+    qDebug() << Q_FUNC_INFO;
+    if (m_isLoading) return;
+
+    m_osmFile.setFileName(filename);
+    if (!m_osmFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qCritical() << "Не удалось открыть файл:" << filename;
+        return;
+    }
+
+    m_xmlReader.setDevice(&m_osmFile);
+    m_isLoading = true;
+    m_currentPhase = LoadPhase::ParsingNodes; // Стартуем с фазы узлов
+    m_internalIdCounter = 1;
+
+    m_tempNodes.clear();
+    m_tempWays.clear();
+
+    // Очищаем сцену
+    m_scene->clear();
+    m_nodeItems.clear();
+    m_edgeItems.clear();
+    m_osmNodePositions.clear();
+    m_osmToInternalId.clear();
+    m_roadGraph.clear();
+
+    qDebug() << "Начало потоковой загрузки OSM (Фаза: Узлы)...";
+
+    QTimer::singleShot(0, this, &SimulationView::processOsmChunk);
+}
+
+void SimulationView::processOsmChunk()
+{
+    if (!m_isLoading || !m_osmFile.isOpen()) {
+        return;
+    }
+
+    const int ELEMENTS_PER_CHUNK = 1000;
+    int processedCount = 0;
+    int nodesFoundInChunk = 0;
+    int waysFoundInChunk = 0;
+    int waysDrawnInChunk = 0;
+    int trafficLightsFound = 0;
+
+    // --- ФАЗА 1: Чтение узлов + Светофоры ---
+    if (m_currentPhase == LoadPhase::ParsingNodes) {
+        while (!m_xmlReader.atEnd() && processedCount < ELEMENTS_PER_CHUNK) {
+            m_xmlReader.readNext();
+
+            if (m_xmlReader.isStartElement()) {
+                QStringView name = m_xmlReader.name();
+
+                if (name == QLatin1String("node")) {
+                    QXmlStreamAttributes attrs = m_xmlReader.attributes();
+                    long long id = attrs.value("id").toLongLong();
+                    double lat = attrs.value("lat").toDouble();
+                    double lon = attrs.value("lon").toDouble();
+
+                    // Переменные для светофора
+                    bool isTrafficLight = false;
+                    QString direction;
+                    bool isPedestrian = false;
+
+                    // Читаем внутренности node, ищем теги
+                    while (!(m_xmlReader.isEndElement() && m_xmlReader.name() == QLatin1String("node"))) {
+                        m_xmlReader.readNext();
+                        if (m_xmlReader.isStartElement() && m_xmlReader.name() == QLatin1String("tag")) {
+                            QString key = m_xmlReader.attributes().value("k").toString();
+                            QString value = m_xmlReader.attributes().value("v").toString();
+
+                            if (key == "highway" && value == "traffic_signals") {
+                                isTrafficLight = true;
+                            } else if (key == "traffic_signals:direction") {
+                                direction = value;
+                            } else if (key == "traffic_signals" && value == "pedestrian") {
+                                isPedestrian = true;
+                            }
+                        }
+                    }
+
+                    QPointF scenePos = latLonToScene(lat, lon);
+
+                    if (!m_osmNodePositions.contains(id)) {
+                        m_osmNodePositions[id] = scenePos;
+                        m_osmToInternalId[id] = m_internalIdCounter++;
+
+                        // === ОТРИСОВКА СВЕТОФОРА ===
+                        if (isTrafficLight) {
+                            TrafficLight tl;
+                            tl.id = (int)id;
+                            tl.position = scenePos;
+                            tl.direction = direction;
+                            tl.isPedestrian = isPedestrian;
+                            m_trafficLights[tl.id] = tl;
+
+                            // Рисуем кружок светофора
+                            QGraphicsEllipseItem* tlItem = new QGraphicsEllipseItem(-6, -6, 12, 12);
+                            tlItem->setPos(scenePos);
+                            tlItem->setBrush(QBrush(Qt::red));
+                            tlItem->setPen(QPen(Qt::black, 1));
+                            tlItem->setZValue(10); // Поверх дорог
+                            m_scene->addItem(tlItem);
+
+                            QGraphicsTextItem* label = new QGraphicsTextItem("🚦");
+                            label->setPos(scenePos.x() + 8, scenePos.y() - 8);
+                            label->setZValue(11);
+                            m_scene->addItem(label);
+
+                            trafficLightsFound++;
+                        }
+                    }
+                    nodesFoundInChunk++;
+                    processedCount++;
+                }
+                else if (name == QLatin1String("way")) {
+                    // qDebug() << "[INFO] Встречен первый <way>. Узлов:" << m_osmNodePositions.size() << "Светофоров:" << m_trafficLights.size();
+                    m_currentPhase = LoadPhase::ParsingWays;
+                    break;
+                }
+            }
+        }
+
+        if (nodesFoundInChunk > 0 || trafficLightsFound > 0) {
+            // qDebug() << "[DEBUG] Фаза 1: Узлов:" << nodesFoundInChunk << ", Светофоров найдено:" << trafficLightsFound;
+        }
+
+        if (m_currentPhase == LoadPhase::ParsingNodes && !m_xmlReader.atEnd()) {
+            QTimer::singleShot(0, this, &SimulationView::processOsmChunk);
+            return;
+        }
+    }
+
+    // --- ФАЗА 2: Чтение и отрисовка дорог ---
+    if (m_currentPhase == LoadPhase::ParsingWays) {
+        while (!m_xmlReader.atEnd() && processedCount < ELEMENTS_PER_CHUNK) {
+            m_xmlReader.readNext();
+
+            if (m_xmlReader.isStartElement() && m_xmlReader.name() == QLatin1String("way")) {
+                QList<long long> nodeRefs;
+                QString highwayType;
+                bool isRoad = false;
+                // long long wayId = m_xmlReader.attributes().value("id").toLongLong();
+
+                while (!(m_xmlReader.isEndElement() && m_xmlReader.name() == QLatin1String("way"))) {
+                    m_xmlReader.readNext();
+                    if (m_xmlReader.isStartElement()) {
+                        if (m_xmlReader.name() == QLatin1String("nd")) {
+                            nodeRefs.append(m_xmlReader.attributes().value("ref").toLongLong());
+                        } else if (m_xmlReader.name() == QLatin1String("tag")) {
+                            QString key = m_xmlReader.attributes().value("k").toString();
+                            QString value = m_xmlReader.attributes().value("v").toString();
+                            if (key == "highway") {
+                                highwayType = value;
+                                // Расширенный фильтр дорог
+                                if (!value.contains("footway") && !value.contains("path") &&
+                                    !value.contains("cycleway") && !value.contains("steps") &&
+                                    !value.contains("bridleway") && !value.contains("service")) {
+                                    // Убрал service, если нужны подъездные пути - верни
+                                    isRoad = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                waysFoundInChunk++;
+
+                if (isRoad && nodeRefs.size() >= 2) {
+                    bool allNodesLoaded = true;
+                    for (long long ref : nodeRefs) {
+                        if (!m_osmNodePositions.contains(ref)) {
+                            allNodesLoaded = false;
+                            break;
+                        }
+                    }
+
+                    if (allNodesLoaded) {
+                        // === ОТЛАДКА ЦВЕТОВ ===
+                        // Раскомментируй, чтобы видеть в консоли, какие типы приходят
+                        // if (waysDrawnInChunk < 10) qDebug() << "Drawing road type:" << highwayType;
+
+                        drawOSMRoad(nodeRefs, highwayType);
+
+                        for (int i = 0; i < nodeRefs.size() - 1; ++i) {
+                            long long fromOsm = nodeRefs[i];
+                            long long toOsm = nodeRefs[i+1];
+                            if (m_osmToInternalId.contains(fromOsm) && m_osmToInternalId.contains(toOsm)) {
+                                addEdge(m_edgeItems.size() + 1, m_osmToInternalId[fromOsm], m_osmToInternalId[toOsm], 1.0);
+                            }
+                        }
+                        waysDrawnInChunk++;
+                    }
+                }
+                processedCount++;
+            }
+        }
+
+        if (waysDrawnInChunk > 0) {
+            viewport()->update();
+        }
+    }
+
+    // --- ФИНАЛ ---
+    if (m_xmlReader.atEnd()) {
+        m_isLoading = false;
+        m_osmFile.close();
+        qDebug() << "[DONE] Загрузка завершена. Узлов:" << m_osmNodePositions.size()
+                 << ", Дорог:" << m_edgeItems.size()
+                 << ", Светофоров:" << m_trafficLights.size(); // Проверь итоговое число
+
+        if (!m_osmNodePositions.isEmpty()) {
+            fitInView(m_scene->itemsBoundingRect(), Qt::KeepAspectRatio);
+        }
+    } else {
+        QTimer::singleShot(0, this, &SimulationView::processOsmChunk);
+    }
+}
+
 void SimulationView::loadOSM(const QString &filename)
 {
     qDebug() << "Loading OSM file:" << filename;
-    parseOSMFile(filename);
+    startStreamingLoad(filename);
+    //parseOSMFile(filename);
     qDebug() << "OSM loading completed. Nodes:" << m_osmNodePositions.size()
              << "Roads drawn:" << m_edgeItems.size();
 }

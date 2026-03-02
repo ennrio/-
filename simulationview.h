@@ -10,12 +10,19 @@
 #include "roadgraph.h"
 #include "vehicle.h"
 #include "vehicleitem.h"
+#include "QFile"
+#include <QXmlStreamReader>
 
 struct TrafficLight {
     int id;
     QPointF position;
     QString direction; // "forward", "backward", "all"
     bool isPedestrian;
+};
+
+struct PendingWay {
+    QList<long long> nodeRefs;
+    QString highwayType;
 };
 
 class SimulationView : public QGraphicsView
@@ -40,7 +47,6 @@ public:
     void setSimulationSpeed(double factor) { m_timeFactor = factor; }
     void drawRoad(long long fromId, long long toId, const QString &type);
     double calculateDistance(double lat1, double lon1, double lat2, double lon2);
-    void loadOSM(const QString &filename);
     QPointF convertLatLon(double lat, double lon) const;
 
 protected:
@@ -74,6 +80,31 @@ private:
     // Вспомогательные методы парсинга
     void parseOSMFile(const QString &filename);
     void drawOSMRoad(const QList<long long> &nodeRefs, const QString &highwayType);
+
+    void loadOSM(const QString &filename);
+
+
+    // Методы для потоковой обработки
+    void startStreamingLoad(const QString &filename);
+    void processOsmChunk();
+
+    // --- ПЕРЕМЕННЫЕ ДЛЯ ПОТОКОВОЙ ЗАГРУЗКИ ---
+
+    enum class LoadPhase {
+        ParsingNodes,   // Читаем узлы
+        ParsingWays,    // Читаем и рисуем дороги
+        Finished
+    };
+
+    QFile m_osmFile;
+    LoadPhase m_currentPhase;
+    QXmlStreamReader m_xmlReader;
+    bool m_isLoading;
+
+    // Буферы для текущей порции
+    QMap<long long, QPointF> m_tempNodes; // Временные узлы текущей порции
+    QList<PendingWay> m_tempWays;         // Временные дороги текущей порции
+    int m_internalIdCounter;              // Счетчик внутренних ID
 };
 
 #endif // SIMULATIONVIEW_H

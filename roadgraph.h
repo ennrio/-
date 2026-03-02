@@ -35,6 +35,7 @@ public:
     QPointF getNodePosition(int node_id) const;
 
     QList<int> findRoute(int startNode, int endNode);
+    void clear();
 };
 
 #endif // ROADGRAPH_H

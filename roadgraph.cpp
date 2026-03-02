@@ -138,3 +138,10 @@ QList<int> RoadGraph::findRoute(int startNode, int endNode)
 
     return path;
 }
+
+void RoadGraph::clear()
+{
+    nodes.clear();
+    edges.clear();
+    adjacencyList.clear();
+}
