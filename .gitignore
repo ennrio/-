@@ -1,2 +1,14 @@
 build/
-.gitignore/
+.qtcreator/
+*.user
+*.pro.user
+
+# Backup files
+*.orig
+*_BACKUP_*
+*_BASE_*
+*_LOCAL_*
+*_REMOTE_*
+
+# CMake
+CMakeLists.txt.user*
