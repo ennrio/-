@@ -30,8 +30,7 @@ int main(int argc, char *argv[])
     view.resize(600, 400);
     view.show();
 
-    // Загружаем МИНИМАЛЬНЫЙ файл
-    view.loadOSM("/home/egor/all/study/6sem/ASUDD/center.osm");
+    view.loadOSM("/home/egor/all/study/6sem/ASUDD/dvortsovaya.osm");
 
     // Добавляем машину в центр
     view.addVehicle(1, QPointF(0, 0));

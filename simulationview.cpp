@@ -20,6 +20,7 @@ SimulationView::SimulationView(QWidget *parent)
 {
     setScene(m_scene);
     setRenderHint(QPainter::Antialiasing);
+    setDragMode(QGraphicsView::ScrollHandDrag);
 
     // Настройка таймера симуляции
     m_simulationTimer.setInterval(16); // ~60 FPS
@@ -253,7 +254,54 @@ void SimulationView::parseOSMFile(const QString &filename)
             long long id = xml.attributes().value("id").toLongLong();
             double lat = xml.attributes().value("lat").toDouble();
             double lon = xml.attributes().value("lon").toDouble();
+
+            // Проверяем теги узла на предмет светофора
+            bool isTrafficLight = false;
+            QString direction;
+            bool isPedestrian = false;
+
+            while (!(xml.isEndElement() && xml.name() == "node")) {
+                xml.readNext();
+                if (xml.isStartElement() && xml.name() == "tag") {
+                    QString key = xml.attributes().value("k").toString();
+                    QString value = xml.attributes().value("v").toString();
+
+                    if (key == "highway" && value == "traffic_signals") {
+                        isTrafficLight = true;
+                    } else if (key == "traffic_signals:direction") {
+                        direction = value;
+                    } else if (key == "traffic_signals" && value == "pedestrian") {
+                        isPedestrian = true;
+                    }
+                }
+            }
+
             tempNodes[id] = QPointF(lat, lon);
+
+            // TODO Если это светофор — сохраняем отдельно
+            if (isTrafficLight) {
+                QPointF scenePos = latLonToScene(lat, lon);
+                TrafficLight tl;
+                tl.id = id;
+                tl.position = scenePos;
+                tl.direction = direction;
+                tl.isPedestrian = isPedestrian;
+                m_trafficLights[id] = tl;
+
+                // Визуализируем как кружок
+                QGraphicsEllipseItem* tlItem = new QGraphicsEllipseItem(-8, -8, 16, 16);
+                tlItem->setPos(scenePos);
+                tlItem->setBrush(QBrush(Qt::red)); // Красный = стоп по умолчанию
+                tlItem->setPen(QPen(Qt::black, 1));
+                tlItem->setZValue(5); // Светофор поверх всего
+                m_scene->addItem(tlItem);
+
+                // Добавляем метку
+                QGraphicsTextItem* label = new QGraphicsTextItem("🚦");
+                label->setPos(scenePos.x() + 10, scenePos.y() - 10);
+                label->setZValue(5);
+                m_scene->addItem(label);
+            }
 
             // Пропускаем содержимое узла
             while (!(xml.isEndElement() && xml.name() == "node")) {
@@ -347,7 +395,7 @@ void SimulationView::parseOSMFile(const QString &filename)
         for (const QPointF &pos : m_osmNodePositions) {
             minX = qMin(minX, pos.x());
             maxX = qMax(maxX, pos.x());
-        qDebug() << "Centered on:" << QPointF((minX + maxX) / 2.0, (minY + maxY) / 2.0);
+        //qDebug() << "Centered on:" << QPointF((minX + maxX) / 2.0, (minY + maxY) / 2.0);
         }
     }
 
