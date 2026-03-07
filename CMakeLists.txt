@@ -16,6 +16,9 @@ qt_add_executable(asudd
     simulationview.h simulationview.cpp
     roadgraph.h roadgraph.cpp
     osmparser.h osmparser.cpp
+    trafficlight.h trafficlight.cpp
+    trafficlightcontroller.h trafficlightcontroller.cpp
+    intersectioncontroller.h intersectioncontroller.cpp
 )
 
 target_link_libraries(asudd

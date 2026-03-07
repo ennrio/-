@@ -244,6 +244,16 @@ void SimulationView::updateSimulation()
     m_scene->update();
 }
 
+QColor SimulationView::colorForState(LightState state)
+{
+    switch (state) {
+    case LightState::Green: return Qt::green;
+    case LightState::Yellow: return Qt::yellow;
+    case LightState::Red: return Qt::red;
+    default: return Qt::gray;
+    }
+}
+
 void SimulationView::updateVehicleGraphics()
 {
     // Эта функция вызывается при изменении графики
@@ -312,26 +322,34 @@ void SimulationView::parseOSMFile(const QString &filename)
             // TODO Если это светофор — сохраняем отдельно
             if (isTrafficLight) {
                 QPointF scenePos = latLonToScene(lat, lon);
-                TrafficLight tl;
-                tl.id = id;
-                tl.position = scenePos;
-                tl.direction = direction;
-                tl.isPedestrian = isPedestrian;
-                m_trafficLights[id] = tl;
+                auto* tl = new TrafficLight(id, scenePos, direction, isPedestrian, this);
+                m_trafficLights[tl->id()] = tl;
 
-                // Визуализируем как кружок
-                QGraphicsEllipseItem* tlItem = new QGraphicsEllipseItem(-8, -8, 16, 16);
-                tlItem->setPos(scenePos);
-                tlItem->setBrush(QBrush(Qt::red)); // Красный = стоп по умолчанию
-                tlItem->setPen(QPen(Qt::black, 1));
-                tlItem->setZValue(5); // Светофор поверх всего
-                m_scene->addItem(tlItem);
+                auto* controller = new TrafficLightController(tl, this);
+                controller->setStandardCycle(30000, 5000, 25000); // зелёный/жёлтый/красный
+                m_controllers[tl->id()] = controller;
 
-                // Добавляем метку
-                QGraphicsTextItem* label = new QGraphicsTextItem("🚦");
-                label->setPos(scenePos.x() + 10, scenePos.y() - 10);
-                label->setZValue(5);
+                auto* item = new QGraphicsEllipseItem(-6, -6, 12, 12);
+                item->setPos(scenePos);
+                item->setBrush(QBrush(colorForState(tl->state()))); // начальный цвет
+                item->setPen(QPen(Qt::black, 1));
+                item->setZValue(10); // поверх дорог
+                m_scene->addItem(item);
+                m_trafficLightItems[tl->id()] = item;  // ← Сохраняем указатель на item
+
+                // Метка 🚦 (опционально)
+                auto* label = new QGraphicsTextItem("🚦");
+                label->setPos(scenePos.x() + 8, scenePos.y() - 8);
+                label->setZValue(11);
                 m_scene->addItem(label);
+
+                // === СВЯЗЬ: Модель → View ===
+                connect(tl, &TrafficLight::stateChanged,
+                        this, [this](int id, LightState state) {
+                            if (m_trafficLightItems.contains(id)) {
+                                m_trafficLightItems[id]->setBrush(QBrush(colorForState(state)));
+                            }
+                        });
             }
 
             // Пропускаем содержимое узла
@@ -587,27 +605,28 @@ void SimulationView::processOsmChunk()
 
                         // === ОТРИСОВКА СВЕТОФОРА ===
                         if (isTrafficLight) {
-                            TrafficLight tl;
-                            tl.id = (int)id;
-                            tl.position = scenePos;
-                            tl.direction = direction;
-                            tl.isPedestrian = isPedestrian;
-                            m_trafficLights[tl.id] = tl;
+                            auto* tl = new TrafficLight(id, scenePos, direction, isPedestrian, this);
+                            m_trafficLights[tl->id()] = tl;
 
-                            // Рисуем кружок светофора
-                            QGraphicsEllipseItem* tlItem = new QGraphicsEllipseItem(-6, -6, 12, 12);
-                            tlItem->setPos(scenePos);
-                            tlItem->setBrush(QBrush(Qt::red));
-                            tlItem->setPen(QPen(Qt::black, 1));
-                            tlItem->setZValue(10); // Поверх дорог
-                            m_scene->addItem(tlItem);
+                            // Создаём контроллер с дефолтным циклом
+                            auto* controller = new TrafficLightController(tl, this);
+                            controller->setStandardCycle(30000, 5000, 25000);
+                            m_controllers[tl->id()] = controller;
 
-                            QGraphicsTextItem* label = new QGraphicsTextItem("🚦");
-                            label->setPos(scenePos.x() + 8, scenePos.y() - 8);
-                            label->setZValue(11);
-                            m_scene->addItem(label);
+                            // Визуализация
+                            auto* item = new QGraphicsEllipseItem(-6, -6, 12, 12);
+                            item->setPos(scenePos);
+                            item->setBrush(QBrush(colorForState(tl->state())));
+                            m_scene->addItem(item);
+                            m_trafficLightItems[tl->id()] = item;
 
-                            trafficLightsFound++;
+                            // ← Ключевая связь: сигнал → обновление UI
+                            connect(tl, &TrafficLight::stateChanged,
+                                    this, [this](int id, LightState state) {
+                                        if (m_trafficLightItems.contains(id)) {
+                                            m_trafficLightItems[id]->setBrush(QBrush(colorForState(state)));
+                                        }
+                                    });
                         }
                     }
                     nodesFoundInChunk++;

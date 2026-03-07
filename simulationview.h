@@ -12,13 +12,8 @@
 #include "vehicleitem.h"
 #include "QFile"
 #include <QXmlStreamReader>
-
-struct TrafficLight {
-    int id;
-    QPointF position;
-    QString direction; // "forward", "backward", "all"
-    bool isPedestrian;
-};
+#include "trafficlight.h"
+#include "trafficlightcontroller.h"
 
 struct PendingWay {
     QList<long long> nodeRefs;
@@ -64,7 +59,11 @@ private:
     QMap<long long, QPointF> m_nodePositions; // кэш позиций узлов в сцене
     QMap<long long, int> m_osmToInternalId;      // Маппинг: OSM ID → внутренний ID
     QMap<long long, QPointF> m_osmNodePositions;
-    QMap<int, TrafficLight> m_trafficLights; // Кэш светофоров
+    QMap<int, TrafficLight*> m_trafficLights; // Кэш светофоров
+    QMap<int, QGraphicsEllipseItem*> m_trafficLightItems; // view
+    QMap<int, TrafficLightController*> m_controllers;  // логика
+
+    QColor colorForState(LightState state);
 
     RoadGraph m_roadGraph;
     QTimer m_simulationTimer;

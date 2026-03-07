@@ -11,4 +11,4 @@ build/
 *_REMOTE_*
 
 # CMake
-CMakeLists.txt.user*
+CMakeLists.txt.user*.qtcreator/
