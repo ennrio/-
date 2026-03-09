@@ -10,6 +10,7 @@
 #include <QColor>
 #include <QtMath>
 #include <QStringView>
+#include <QRandomGenerator>
 
 
 
@@ -22,10 +23,12 @@ SimulationView::SimulationView(QWidget *parent)
     , m_isLoading(false)
     , m_currentPhase(LoadPhase::ParsingNodes)
     , m_internalIdCounter(1)
+    , m_roadGraph(new RoadGraph())
 {
     setScene(m_scene);
     setRenderHint(QPainter::Antialiasing);
     setDragMode(QGraphicsView::ScrollHandDrag);
+
 
     // Настройка таймера симуляции
     m_simulationTimer.setInterval(16); // ~60 FPS
@@ -37,12 +40,24 @@ SimulationView::SimulationView(QWidget *parent)
     // Настраиваем сцену
     m_scene->setSceneRect(-100, -100, 2000, 2000);
     setSceneRect(-100, -100, 2000, 2000);
+
+    // Таймер для спавна автомобилей
+    m_vehicleSpawnTimer.setInterval(3000); // Каждые 3 секунды
+    connect(&m_vehicleSpawnTimer, &QTimer::timeout, this, &SimulationView::spawnVehicle);
+
+    connect(this, &SimulationView::osmLoadingFinished,
+            this, &SimulationView::onOSMLoadingFinished,
+            Qt::UniqueConnection);
+}
+
+SimulationView::~SimulationView()
+{
+        delete m_roadGraph;
 }
 
 void SimulationView::show()
 {
     QGraphicsView::show();
-    setupWindowsSpecific();
     #if defined(Q_OS_WIN)
         setupWindowsSpecific();
     #elif defined(Q_OS_LINUX)
@@ -59,7 +74,7 @@ void SimulationView::show()
 void SimulationView::addNode(int id, double x, double y)
 {
     // Добавляем в граф
-    m_roadGraph.addNode(id, x, y);
+    m_roadGraph->addNode(id, x, y);
 
     // Создаем графический элемент узла
     QGraphicsEllipseItem* nodeItem = new QGraphicsEllipseItem(-3, -3, 6, 6);
@@ -73,10 +88,10 @@ void SimulationView::addNode(int id, double x, double y)
     m_nodeItems[id] = nodeItem;
 }
 
-void SimulationView::addEdge(int id, int from, int to, double length)
+void SimulationView::addEdge(int id, int from, int to, double length, bool bidirectional)
 {
     // Добавляем в граф
-    m_roadGraph.addEdge(id, from, to, length);
+    m_roadGraph->addEdge(id, from, to, length, bidirectional);
 
     // Получаем позиции узлов
     QPointF fromPos = getNodePosition(from);
@@ -111,55 +126,24 @@ void SimulationView::addVehicle(int id, const QPointF& startPosition)
     qDebug() << "Vehicle" << id << "added at position" << startPosition;
 }
 
-void SimulationView::setVehicleRoute(int vehicleId, const QList<int>& nodeIds)
+void SimulationView::setVehicleRoute(int vehicleId, const QList<QPointF> &routePoints)
 {
     if (!m_vehicles.contains(vehicleId)) {
         qWarning() << "Vehicle" << vehicleId << "not found";
         return;
     }
 
-    // Находим путь через граф
-    if (nodeIds.size() < 2) {
-        qWarning() << "Route needs at least 2 nodes";
+    if (routePoints.size() < 2) {
+        qWarning() << "Route needs at least 2 points";
         return;
-    }
-
-    // Ищем маршрут через граф с помощью алгоритма поиска пути
-    QList<int> path;
-
-    // Проходим по всем узлам и находим путь между ними
-    for (int i = 0; i < nodeIds.size() - 1; i++) {
-        int start = nodeIds[i];
-        int end = nodeIds[i + 1];
-
-        QList<int> segmentPath = m_roadGraph.findRoute(start, end);
-
-        // Если это не первый сегмент, убираем первую точку (она совпадает с последней предыдущего сегмента)
-        if (i > 0 && !segmentPath.isEmpty()) {
-            segmentPath.removeFirst();
-        }
-
-        path.append(segmentPath);
-    }
-
-    if (path.isEmpty()) {
-        qWarning() << "No valid route found through the graph";
-        return;
-    }
-
-    QList<QPointF> routePoints;
-
-    // Преобразуем ID узлов в точки
-    for (int nodeId : path) {
-        routePoints.append(getNodePosition(nodeId));
     }
 
     // Устанавливаем маршрут транспортному средству
     m_vehicles[vehicleId]->setRoute(routePoints);
-    m_vehicles[vehicleId]->setSpeed(20.0); // Скорость 5 м/с
+    m_vehicles[vehicleId]->setSpeed(10.0 + QRandomGenerator::global()->bounded(5)); // 10-15 м/с
 
-    qDebug() << "Route set for vehicle" << vehicleId << "with" << routePoints.size() << "points";
-    qDebug() << "Path nodes:" << path;
+    qDebug() << "Route set for vehicle" << vehicleId
+             << "with" << routePoints.size() << "points";
 }
 
 void SimulationView::setupWindowsSpecific()
@@ -175,14 +159,15 @@ void SimulationView::setupLinuxSpecific()
 QPointF SimulationView::getNodePosition(int nodeId) const
 {
     // Используем метод из RoadGraph для получения реальной позиции узла
-    return m_roadGraph.getNodePosition(nodeId);
+    return m_roadGraph->getNodePosition(nodeId);
 }
 
 void SimulationView::startSimulation()
 {
     m_lastUpdateTime = m_elapsedTimer.elapsed() / 1000.0;
     m_simulationTimer.start();
-    qDebug() << "Simulation started";
+    m_vehicleSpawnTimer.start();
+    qDebug() << "Simulation started with vehicle spawning";
 }
 
 void SimulationView::stopSimulation()
@@ -240,7 +225,7 @@ void SimulationView::updateSimulation()
     for (auto it = m_vehicles.begin(); it != m_vehicles.end(); ++it) {
         it.value()->update(deltaTime);
     }
-
+    updateVehicleGraphics();
     // Обновляем сцену
     m_scene->update();
 }
@@ -294,6 +279,135 @@ void SimulationView::cycleTrafficLightState(long long id)
              << "(will auto-resume in 30s)";
 }
 
+void SimulationView::onOSMLoadingFinished()
+{
+    qDebug() << "=== OSM Loading Finished ===";
+    qDebug() << "RoadGraph Nodes:" << m_roadGraph->nodeCount();
+    qDebug() << "RoadGraph Edges:" << m_roadGraph->edgeCount();
+    qDebug() << "OSM→Internal mappings:" << m_osmToInternalId.size();
+
+    int nodesWithNeighbors = 0;
+    int nodesWithoutNeighbors = 0;
+    auto nodes = m_roadGraph->getNodes().keys();
+
+    for (int nodeId : nodes) {
+        int neighborCount = m_roadGraph->getNeighbors(nodeId).size();
+        if (neighborCount > 0) {
+            nodesWithNeighbors++;
+        } else {
+            nodesWithoutNeighbors++;
+        }
+    }
+
+    qDebug() << "Nodes with neighbors:" << nodesWithNeighbors;
+    qDebug() << "Nodes WITHOUT neighbors:" << nodesWithoutNeighbors;  // ❌ Если > 0 — проблема!
+
+    // ✅ Проверка: первые 10 узлов и их соседи
+    for (int i = 0; i < qMin(10, nodes.size()); i++) {
+        int nodeId = nodes[i];
+        auto neighbors = m_roadGraph->getNeighbors(nodeId);
+        qDebug() << "Node" << nodeId << "neighbors:" << neighbors;
+    }
+
+    startSimulation();
+}
+
+LightState SimulationView::getTrafficLightStateAtPosition(const QPointF &position, qreal radius)
+{
+    for (auto* tl : m_trafficLights) {
+        qreal distance = QLineF(position, tl->position()).length();
+        if (distance <= radius) {
+            return tl->state();
+        }
+    }
+    return LightState::Green; // По умолчанию зелёный
+}
+
+void SimulationView::spawnVehicle()
+{
+    if (m_osmNodePositions.isEmpty() || m_roadGraph->nodeCount() < 2) {
+        qDebug() << "Cannot spawn: RoadGraph has" << m_roadGraph->nodeCount() << "nodes";
+        return;
+    }
+
+    // ✅ Получаем ТОЛЬКО узлы у которых есть соседи
+    QList<int> internalIds;
+    auto allNodes = m_roadGraph->getNodes().keys();
+    for (int nodeId : allNodes) {
+        if (m_roadGraph->getNeighbors(nodeId).size() > 0) {
+            internalIds.append(nodeId);
+        }
+    }
+
+    if (internalIds.size() < 2) {
+        qDebug() << "Not enough connected nodes for routing:" << internalIds.size();
+        return;
+    }
+
+    // ✅ Пробуем найти маршрут
+    int attempts = 0;
+    QList<QPointF> routePoints;
+
+    while (attempts < 5 && routePoints.isEmpty()) {
+        attempts++;
+
+        int startIdx = QRandomGenerator::global()->bounded(internalIds.size());
+        int endIdx = QRandomGenerator::global()->bounded(internalIds.size());
+
+        if (startIdx == endIdx) continue;
+
+        int startInternal = internalIds[startIdx];
+        int endInternal = internalIds[endIdx];
+
+        qDebug() << "Attempt" << attempts << ": Finding route"
+                 << startInternal << "->" << endInternal
+                 << "(start neighbors:" << m_roadGraph->getNeighbors(startInternal).size() << ")";
+
+        QList<int> path = m_roadGraph->findRoute(startInternal, endInternal);
+
+        if (path.isEmpty()) {
+            qDebug() << "No path found, trying again...";
+            continue;
+        }
+
+        // ✅ Конвертируем путь в координаты
+        for (int nodeId : path) {
+            long long osmId = -1;
+            for (auto it = m_osmToInternalId.begin(); it != m_osmToInternalId.end(); ++it) {
+                if (it.value() == nodeId) {
+                    osmId = it.key();
+                    break;
+                }
+            }
+            if (osmId >= 0 && m_osmNodePositions.contains(osmId)) {
+                routePoints.append(m_osmNodePositions[osmId]);
+            }
+        }
+    }
+
+    if (routePoints.size() < 2) {
+        qDebug() << "Failed to create route after 5 attempts";
+        return;
+    }
+
+    int vehicleId = ++m_vehicleCounter;
+    QPointF startPos = routePoints.first();
+    addVehicle(vehicleId, startPos);
+    setVehicleRoute(vehicleId, routePoints);
+
+    if (m_vehicles.contains(vehicleId)) {
+        m_vehicles[vehicleId]->setTrafficLightChecker(
+            [this](const QPointF& pos, qreal radius) {
+                return getTrafficLightStateAtPosition(pos, radius);
+            }
+            );
+        m_vehicles[vehicleId]->setTrafficLightAwareness(true);
+    }
+
+    qDebug() << "Vehicle" << vehicleId << "spawned with route of"
+             << routePoints.size() << "points";
+}
+
 QColor SimulationView::colorForState(LightState state)
 {
     switch (state) {
@@ -306,9 +420,11 @@ QColor SimulationView::colorForState(LightState state)
 
 void SimulationView::updateVehicleGraphics()
 {
-    // Эта функция вызывается при изменении графики
-    for (auto it = m_vehicleItems.begin(); it != m_vehicleItems.end(); ++it) {
-        it.value()->update();
+    for (auto it = m_vehicles.begin(); it != m_vehicles.end(); ++it) {
+        int id = it.value()->id();
+        if (m_vehicleItems.contains(id)) {
+            m_vehicleItems[id]->setPos(it.value()->position());
+        }
     }
 }
 
@@ -409,6 +525,12 @@ void SimulationView::parseOSMFile(const QString &filename)
         }
     }
 
+    qDebug() << "[DEBUG] Temp nodes loaded:" << tempNodes.size();
+    qDebug() << "[DEBUG] Ways to draw:" << waysToDraw.size();
+    if (!waysToDraw.isEmpty()) {
+        qDebug() << "[DEBUG] First way has" << waysToDraw.first().first.size() << "node refs";
+    }
+
     if (xml.hasError()) {
         qWarning() << "XML error during node parsing:" << xml.errorString();
         return;
@@ -422,7 +544,7 @@ void SimulationView::parseOSMFile(const QString &filename)
     while (!xml.atEnd() && !xml.hasError()) {
         xml.readNext();
         if (xml.isStartElement() && xml.name() == "way") {
-            long long wayId = xml.attributes().value("id").toLongLong();
+            //long long wayId = xml.attributes().value("id").toLongLong();
             QList<long long> nodeRefs;
             QString highwayType;
             bool isRoad = false;
@@ -460,30 +582,62 @@ void SimulationView::parseOSMFile(const QString &filename)
         return;
     }
 
-    // Этап 3: Добавляем узлы в граф и сцену
-    int internalIdCounter = 1;
-    for (auto it = tempNodes.begin(); it != tempNodes.end(); ++it) {
-        long long osmId = it.key();
-        double lat = it.value().x();
-        double lon = it.value().y();
+        // Этап 3: Добавляем узлы в граф и сцену
+        int internalIdCounter = 1;
+        int nodesAdded = 0;
+        int edgeId = 1;  // ✅ ОБЪЯВЛЯЕМ edgeId ЗДЕСЬ
 
-        // Конвертируем в координаты сцены
-        QPointF scenePos = latLonToScene(lat, lon);
-        m_osmNodePositions[osmId] = scenePos;
+        for (auto it = tempNodes.begin(); it != tempNodes.end(); ++it) {
+            long long osmId = it.key();
+            double lat = it.value().x();
+            double lon = it.value().y();
 
-        // Маппинг OSM ID → внутренний ID
-        m_osmToInternalId[osmId] = internalIdCounter;
+            QPointF scenePos = latLonToScene(lat, lon);
+            m_osmNodePositions[osmId] = scenePos;
+            m_osmToInternalId[osmId] = internalIdCounter;
 
-        // Добавляем узел в граф (только если он используется в дорогах)
+            // Проверяем, используется ли узел в дорогах
+            bool usedInWay = false;
+            for (const auto &way : waysToDraw) {
+                if (way.first.contains(osmId)) {
+                    usedInWay = true;
+                    break;
+                }
+            }
+
+            if (usedInWay) {
+                //  Добавляем узел в граф
+                m_roadGraph->addNode(internalIdCounter, scenePos.x(), scenePos.y());
+                nodesAdded++;
+            }
+            internalIdCounter++;
+        }
+
+        //  Теперь добавляем рёбра (edgeId уже объявлен)
         for (const auto &way : waysToDraw) {
-            if (way.first.contains(osmId)) {
-                addNode(internalIdCounter, scenePos.x(), scenePos.y());
-                break;
+            const QList<long long> &nodeRefs = way.first;
+
+            for (int i = 0; i < nodeRefs.size() - 1; ++i) {
+                long long fromOsmId = nodeRefs[i];
+                long long toOsmId = nodeRefs[i + 1];
+
+                if (m_osmToInternalId.contains(fromOsmId) && m_osmToInternalId.contains(toOsmId)) {
+                    int fromInternal = m_osmToInternalId[fromOsmId];
+                    int toInternal = m_osmToInternalId[toOsmId];
+
+                    QPointF fromPos = m_osmNodePositions[fromOsmId];
+                    QPointF toPos = m_osmNodePositions[toOsmId];
+                    double length = QLineF(fromPos, toPos).length();
+
+                    m_roadGraph->addEdge(edgeId++, fromInternal, toInternal, length, true);
+                }
             }
         }
 
         internalIdCounter++;
-    }
+
+
+
 
     if (!m_osmNodePositions.isEmpty()) {
         double minX = std::numeric_limits<double>::max();
@@ -491,7 +645,7 @@ void SimulationView::parseOSMFile(const QString &filename)
         double minY = std::numeric_limits<double>::max();
         double maxY = std::numeric_limits<double>::lowest();
 
-        for (const QPointF &pos : m_osmNodePositions) {
+        for (QPointF& pos : m_osmNodePositions) {
             minX = qMin(minX, pos.x());
             maxX = qMax(maxX, pos.x());
         //qDebug() << "Centered on:" << QPointF((minX + maxX) / 2.0, (minY + maxY) / 2.0);
@@ -499,7 +653,6 @@ void SimulationView::parseOSMFile(const QString &filename)
     }
 
     // Этап 4: Рисуем дороги
-    int edgeId = 1;
     for (const auto &way : waysToDraw) {
         const QList<long long> &nodeRefs = way.first;
         const QString &highwayType = way.second;
@@ -519,12 +672,14 @@ void SimulationView::parseOSMFile(const QString &filename)
                                       qPow(toPos.y() - fromPos.y(), 2));
 
                 // Добавляем ребро в граф
-                addEdge(edgeId++, fromId, toId, length);
+                addEdge(edgeId++, fromId, toId, length, true);
             }
         }
 
         // Визуализируем всю дорогу целиком (для красоты)
         drawOSMRoad(nodeRefs, highwayType);
+
+
     }
 }
 
@@ -591,8 +746,10 @@ void SimulationView::startStreamingLoad(const QString &filename)
     m_edgeItems.clear();
     m_osmNodePositions.clear();
     m_osmToInternalId.clear();
-    m_roadGraph.clear();
+    m_roadGraph->clear();
 
+    m_internalIdCounter = 1;
+    m_edgeIdCounter = 1;
     qDebug() << "Начало потоковой загрузки OSM (Фаза: Узлы)...";
 
     QTimer::singleShot(0, this, &SimulationView::processOsmChunk);
@@ -651,7 +808,8 @@ void SimulationView::processOsmChunk()
 
                     if (!m_osmNodePositions.contains(id)) {
                         m_osmNodePositions[id] = scenePos;
-                        m_osmToInternalId[id] = m_internalIdCounter++;
+                        m_osmToInternalId[id] = m_internalIdCounter;
+                        m_roadGraph->addNode(m_internalIdCounter, scenePos.x(), scenePos.y());
 
                         // === ОТРИСОВКА СВЕТОФОРА ===
                         if (isTrafficLight) {
@@ -686,6 +844,7 @@ void SimulationView::processOsmChunk()
                                         }
                                     });
                         }
+                        m_internalIdCounter++;
                     }
                     nodesFoundInChunk++;
                     processedCount++;
@@ -717,7 +876,6 @@ void SimulationView::processOsmChunk()
                 QList<long long> nodeRefs;
                 QString highwayType;
                 bool isRoad = false;
-                // long long wayId = m_xmlReader.attributes().value("id").toLongLong();
 
                 while (!(m_xmlReader.isEndElement() && m_xmlReader.name() == QLatin1String("way"))) {
                     m_xmlReader.readNext();
@@ -729,11 +887,9 @@ void SimulationView::processOsmChunk()
                             QString value = m_xmlReader.attributes().value("v").toString();
                             if (key == "highway") {
                                 highwayType = value;
-                                // Расширенный фильтр дорог
                                 if (!value.contains("footway") && !value.contains("path") &&
                                     !value.contains("cycleway") && !value.contains("steps") &&
                                     !value.contains("bridleway") && !value.contains("service")) {
-                                    // Убрал service, если нужны подъездные пути - верни
                                     isRoad = true;
                                 }
                             }
@@ -753,17 +909,28 @@ void SimulationView::processOsmChunk()
                     }
 
                     if (allNodesLoaded) {
-                        // === ОТЛАДКА ЦВЕТОВ ===
-                        // Раскомментируй, чтобы видеть в консоли, какие типы приходят
-                        // if (waysDrawnInChunk < 10) qDebug() << "Drawing road type:" << highwayType;
-
                         drawOSMRoad(nodeRefs, highwayType);
 
+                        // ✅ ДОБАВЛЯЕМ РЁБРА В ROADGRAPH
                         for (int i = 0; i < nodeRefs.size() - 1; ++i) {
                             long long fromOsm = nodeRefs[i];
                             long long toOsm = nodeRefs[i+1];
+
                             if (m_osmToInternalId.contains(fromOsm) && m_osmToInternalId.contains(toOsm)) {
-                                addEdge(m_edgeItems.size() + 1, m_osmToInternalId[fromOsm], m_osmToInternalId[toOsm], 1.0);
+                                int fromInternal = m_osmToInternalId[fromOsm];
+                                int toInternal = m_osmToInternalId[toOsm];
+
+                                // ✅ Проверка: не добавлено ли уже
+                                auto existingNeighbors = m_roadGraph->getNeighbors(fromInternal);
+                                if (!existingNeighbors.contains(toInternal)) {
+                                    m_roadGraph->addEdge(
+                                        m_edgeIdCounter++,
+                                        fromInternal,
+                                        toInternal,
+                                        1.0,
+                                        true
+                                        );
+                                }
                             }
                         }
                         waysDrawnInChunk++;
@@ -784,8 +951,12 @@ void SimulationView::processOsmChunk()
         m_osmFile.close();
         qDebug() << "[DONE] Загрузка завершена. Узлов:" << m_osmNodePositions.size()
                  << ", Дорог:" << m_edgeItems.size()
-                 << ", Светофоров:" << m_trafficLights.size(); // Проверь итоговое число
+                 << ", Светофоров:" << m_trafficLights.size();
 
+        qDebug() << "RoadGraph status before signal:"
+                 << "Nodes:" << m_roadGraph->nodeCount()
+                 << "Edges:" << m_roadGraph->edgeCount();
+        emit osmLoadingFinished();
         if (!m_osmNodePositions.isEmpty()) {
             fitInView(m_scene->itemsBoundingRect(), Qt::KeepAspectRatio);
         }

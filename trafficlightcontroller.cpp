@@ -154,9 +154,9 @@ void TrafficLightController::startPhase(int index)
     case LightState::Green: stateStr = "GREEN"; break;
     case LightState::Off: stateStr = "OFF"; break;
     }
-    qDebug() << "TrafficLight" << m_light->id()
-             << "→" << stateStr
-             << "(" << phase.durationMs << "ms)";
+    // qDebug() << "TrafficLight" << m_light->id()
+    //          << "→" << stateStr
+    //          << "(" << phase.durationMs << "ms)";
 #endif
 }
 

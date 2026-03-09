@@ -1,141 +1,148 @@
 #include "roadgraph.h"
+#include <QDebug>
 
-void RoadGraph::addNode(int _id, double _x, double _y)
+void RoadGraph::addNode(int id, double x, double y)
 {
-    {
-        Node node;
-        node.id = _id;
-        node.x = _x;
-        node.y = _y;
-        nodes.insert(_id,node);
+    Node node{ id, x, y };
+    nodes.insert(id, node);
+
+    // Инициализируем список смежности для нового узла
+    if (!adjacencyList.contains(id)) {
+        adjacencyList[id] = QList<int>();
     }
 }
 
-void RoadGraph::addEdge(int _id, double _from, int _to, double _length)
+void RoadGraph::addEdge(int id, int fromNodeId, int toNodeId, double length, bool bidirectional)
 {
-    Edge edge;
-    edge.id = _id;
-    edge.fromNodeId = _from;
-    edge.toNodeId = _to;
-    edge.length = _length;
-    edges.insert(_id, edge);
+    // Создаём ребро
+    Edge edge{ id, fromNodeId, toNodeId, length };
+    edges.insert(id, edge);
 
-    int fromNodeId = (int)_from;
+    //  Добавляем ID узла-соседа, а не ребра!
     if (!adjacencyList.contains(fromNodeId)) {
         adjacencyList[fromNodeId] = QList<int>();
     }
-    adjacencyList[fromNodeId].append(_id);
+    adjacencyList[fromNodeId].append(toNodeId);
+
+    //  Если дорога двусторонняя — добавляем обратное ребро
+    if (bidirectional) {
+        Edge reverseEdge{ -id, toNodeId, fromNodeId, length }; // отрицательный ID для обратного
+        edges.insert(-id, reverseEdge);
+
+        if (!adjacencyList.contains(toNodeId)) {
+            adjacencyList[toNodeId] = QList<int>();
+        }
+        adjacencyList[toNodeId].append(fromNodeId);
+    }
+
+    static int debugCount = 0;
+    if (debugCount < 10) {
+        qDebug() << "Edge added:" << fromNodeId << "->" << toNodeId;
+        qDebug() << "  Adjacency list for" << fromNodeId << ":" << adjacencyList[fromNodeId];
+        debugCount++;
+    }
 }
 
-QPointF RoadGraph::getNodePosition(int node_id) const
+QPointF RoadGraph::getNodePosition(int nodeId) const
 {
-    if (nodes.contains(node_id)) {
-        Node node = nodes.value(node_id);
+    if (nodes.contains(nodeId)) {
+        const Node& node = nodes.value(nodeId);
         return QPointF(node.x, node.y);
     }
     return QPointF(0, 0);
 }
 
+QList<int> RoadGraph::getNeighbors(int nodeId) const
+{
+    return adjacencyList.value(nodeId);
+}
+
 QList<int> RoadGraph::findRoute(int startNode, int endNode)
 {
-    // Если начальный или конечный узел не существуют
-    if (!nodes.contains(startNode) || !nodes.contains(endNode)) {
-        fprintf(stderr, "Start or end node not found\n");
+    if (!nodes.contains(startNode)) {
+        qWarning() << "RoadGraph: Start node" << startNode << "not found!";
+        qWarning() << "Available nodes:" << nodes.keys().mid(0, 10);
         return QList<int>();
     }
-
-    // Если начальный и конечный узел совпадают
+    if (!nodes.contains(endNode)) {
+        qWarning() << "RoadGraph: End node" << endNode << "not found!";
+        return QList<int>();
+    }
     if (startNode == endNode) {
-        return QList<int>{startNode};
+        return QList<int>{ startNode };
     }
 
-    // Алгоритм Дейкстры
-    QMap<int, double> distances; // Расстояния от начального узла
-    QMap<int, int> previousNode; // Предыдущий узел на кратчайшем пути
 
-    // Приоритетная очередь для обработки узлов
-    using NodeDistPair = std::pair<double, int>; // <расстояние, id узла>
-    std::priority_queue<NodeDistPair, std::vector<NodeDistPair>, std::greater<NodeDistPair>> pq;
+    qDebug() << "=== findRoute: ПРЕДВАРИТЕЛЬНАЯ ПРОВЕРКА ===";
+    qDebug() << "this pointer:" << this;
+    qDebug() << "adjacencyList.size():" << adjacencyList.size();
+    qDebug() << "adjacencyList keys (first 10):" << adjacencyList.keys().mid(0, 10);
+    qDebug() << "startNode:" << startNode;
+    qDebug() << "adjacencyList[startNode]:" << adjacencyList.value(startNode);
+    qDebug() << "nodes.size():" << nodes.size();
+    qDebug() << "edges.size():" << edges.size();
+
+    // Алгоритм Дейкстры
+    QMap<int, double> distances;
+    QMap<int, int> previous;
+
+    using NodeDist = std::pair<double, int>;
+    std::priority_queue<NodeDist, std::vector<NodeDist>, std::greater<NodeDist>> pq;
 
     // Инициализация
     for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-        int nodeId = it.key();
-        distances[nodeId] = std::numeric_limits<double>::infinity();
-        previousNode[nodeId] = -1;
+        distances[it.key()] = std::numeric_limits<double>::infinity();
+        previous[it.key()] = -1;
     }
 
     distances[startNode] = 0.0;
-    pq.push(std::make_pair(0.0, startNode));
+    pq.push({ 0.0, startNode });
 
+    int visited = 0;
     while (!pq.empty()) {
-        NodeDistPair current = pq.top();
+        auto [currDist, currNode] = pq.top();
         pq.pop();
+        visited++;
 
-        double currentDist = current.first;
-        int currentNode = current.second;
+        if (currNode == endNode) break;
+        if (currDist > distances[currNode]) continue;
 
-        // Если мы достигли конечного узла
-        if (currentNode == endNode) {
-            fprintf(stderr, "Reached destination node %d\n", currentNode);
-            break;
-        }
-
-        // Если текущее расстояние больше сохраненного, пропускаем
-        if (currentDist > distances[currentNode]) {
-            continue;
-        }
-
-        // Обрабатываем всех соседей
-        if (adjacencyList.contains(currentNode)) {
-            for (int edgeId : adjacencyList[currentNode]) {
-                const Edge& edge = edges[edgeId];
-                int neighborNode = edge.toNodeId;
-
-                // Пропускаем, если ребро ведет обратно
-                if (neighborNode == currentNode) {
-                    continue;
+        if (adjacencyList.contains(currNode)) {
+            for (int neighbor : adjacencyList[currNode]) {
+                // Ищем ребро между currNode и neighbor
+                double edgeLength = -1;
+                for (const Edge& edge : edges) {
+                    if (edge.fromNodeId == currNode && edge.toNodeId == neighbor) {
+                        edgeLength = edge.length;
+                        break;
+                    }
                 }
+                if (edgeLength < 0) continue; // Ребро не найдено
 
-                double newDist = currentDist + edge.length;
-
-                if (newDist < distances[neighborNode]) {
-                    distances[neighborNode] = newDist;
-                    previousNode[neighborNode] = currentNode;
-                    pq.push(std::make_pair(newDist, neighborNode));
-                    fprintf(stderr, "Updated distance to node %d: %.2f (via node %d)\n",
-                            neighborNode, newDist, currentNode);
+                double newDist = currDist + edgeLength;
+                if (newDist < distances[neighbor]) {
+                    distances[neighbor] = newDist;
+                    previous[neighbor] = currNode;
+                    pq.push({ newDist, neighbor });
                 }
             }
         }
     }
 
-    // Восстанавливаем путь
-    if (previousNode[endNode] == -1) {
-        fprintf(stderr, "No path found from %d to %d\n", startNode, endNode);
+    qInfo() << "Dijkstra visited" << visited << "nodes";
+
+    // Восстановление пути
+    if (previous[endNode] == -1 && startNode != endNode) {
+        qWarning() << "No path found from" << startNode << "to" << endNode;
         return QList<int>();
     }
 
     QList<int> path;
-    int currentNode = endNode;
-
-    // Восстанавливаем путь в обратном порядке
-    while (currentNode != -1) {
-        path.prepend(currentNode);
-        currentNode = previousNode[currentNode];
+    for (int curr = endNode; curr != -1; curr = previous[curr]) {
+        path.prepend(curr);
     }
 
-    fprintf(stderr, "Path found with %d nodes. Total distance: %.2f\n",
-            path.size(), distances[endNode]);
-
-    fprintf(stderr, "Route: ");
-    for (int i = 0; i < path.size(); i++) {
-        fprintf(stderr, "%d", path[i]);
-        if (i < path.size() - 1) {
-            fprintf(stderr, " -> ");
-        }
-    }
-    fprintf(stderr, "\n");
-
+    qInfo() << "Path found:" << path.size() << "nodes, distance:" << distances[endNode];
     return path;
 }
 

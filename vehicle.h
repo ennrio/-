@@ -1,61 +1,69 @@
-#ifndef VEHICLE_H
-#define VEHICLE_H
-
+#pragma once
 #include <QObject>
 #include <QPointF>
 #include <QList>
+#include "trafficlight.h"
 
-class Vehicle : public QObject
-{
+/*
+┌─────────────────────────────────────────────────────────┐
+│                    Vehicle                              │
+│  • position, speed, route                               │
+│  • update(deltaTime) — основная логика                  │
+│  • checkTrafficLightAhead() — проверка светофора        │
+│  • applyBraking()/applyAcceleration() — физика          │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          │ запрашивает состояние
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│              SimulationView                             │
+│  • m_trafficLights — модель светофоров                  │
+│  • m_controllers — контроллеры                          │
+│  • getTrafficLightAtPosition() — поиск по координатам   │
+└─────────────────────────────────────────────────────────┘
+
+*/
+
+class Vehicle : public QObject {
     Q_OBJECT
-    Q_PROPERTY(QPointF position READ position NOTIFY positionChanged)
-    Q_PROPERTY(double speed READ speed WRITE setSpeed NOTIFY speedChanged)
-    Q_PROPERTY(double heading READ heading WRITE setHeading NOTIFY headingChanged)
-
-    int m_id;
-    QPointF m_position;
-    double m_speed;      // м/с
-    double m_heading;    // радианы
-    QList<QPointF> m_routePoints;  // последовательность точек для движения
-    int m_currentRouteIndex;
-    bool m_isMoving;
-
 public:
-    explicit Vehicle(int id = 0, QObject *parent = nullptr);
-    explicit Vehicle(const QPointF& startPosition, int id = 0, QObject *parent = nullptr);
+    explicit Vehicle(QPointF startPosition, int id, QObject* parent = nullptr);
 
-    // Геттеры
-    QPointF position() const { return m_position; }
-    double speed() const { return m_speed; }
-    double heading() const { return m_heading; }
-    int id() const { return m_id; }
-    bool isMoving() const { return m_isMoving; }
-
-    // Сеттеры
-    void setPosition(const QPointF& position);
-    void setSpeed(double speed);
-    void setHeading(double heading);
-    void setId(int id) { m_id = id; }
-
-    // Маршрутизация
+    void update(double deltaTime);
     void setRoute(const QList<QPointF>& route);
-    void clearRoute() { m_routePoints.clear(); m_currentRouteIndex = 0; m_isMoving = false; }
-    const QList<QPointF>& route() const { return m_routePoints; }
+    void setSpeed(qreal maxSpeed);
+    void setTrafficLightAwareness(bool enabled);
 
-    // Основной метод обновления
-    void update(double dt);  // dt в секундах — интегрирование Эйлера
+    QPointF position() const { return m_position; }
+    qreal speed() const { return m_speed; }
+    int id() const { return m_id; }
 
-    // Вспомогательные методы
-    void moveTo(const QPointF& target);
-    void stop() { m_speed = 0.0; m_isMoving = false; }
-    void start() { if (!m_routePoints.isEmpty()) m_isMoving = true; }
+    // Для связи с SimulationView
+    using TrafficLightChecker = std::function<LightState(const QPointF&, qreal)>;
+    void setTrafficLightChecker(TrafficLightChecker checker);
 
 signals:
-    void positionChanged();
-    void speedChanged();
-    void headingChanged();
-    void routeCompleted();
-    void routeChanged();
-};
+    void positionChanged(int id, QPointF newPos);
+    void stoppedAtLight(int id, long long lightId);
+    void startedFromLight(int id, long long lightId);
 
-#endif // VEHICLE_H
+private:
+    int m_id;
+    QPointF m_position;
+    qreal m_speed{0.0};
+    qreal m_maxSpeed{15.0}; // м/с (~54 км/ч)
+    qreal m_acceleration{2.0}; // м/с²
+    qreal m_deceleration{4.0}; // м/с² для торможения
+    QList<QPointF> m_route;
+    int m_currentRouteIndex{0};
+
+    bool m_trafficLightAware{true};
+    long long m_stoppedAtLightId{-1};
+    TrafficLightChecker m_trafficLightChecker;
+
+    void moveAlongPath(qreal distance);
+    qreal distanceToNextPoint() const;
+    bool checkTrafficLightAhead();
+    void applyBraking(double deltaTime);
+    void applyAcceleration(double deltaTime);
+};

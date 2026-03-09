@@ -24,14 +24,16 @@ struct PendingWay {
 class SimulationView : public QGraphicsView
 {
     Q_OBJECT
+
+//METHODS
 public:
     SimulationView(QWidget *parent = nullptr);
-
+    ~SimulationView();
     void show();
     void addNode(int id, double x, double y);
-    void addEdge(int id, int from, int to, double length);
+    void addEdge(int id, int from, int to, double length, bool bidirectional);
     void addVehicle(int id, const QPointF& startPosition);
-    void setVehicleRoute(int vehicleId, const QList<int>& nodeIds);
+    void setVehicleRoute(int vehicleId, const QList<QPointF>& routePoints);
 
 
     //условная компиляция
@@ -45,16 +47,26 @@ public:
     double calculateDistance(double lat1, double lon1, double lat2, double lon2);
     QPointF convertLatLon(double lat, double lon) const;
 
+//MEMBERS
+public:
+
 protected:
     void wheelEvent(QWheelEvent *event) override;
 
 private slots:
     void updateSimulation();
-
     // обработка кликов по светофору
     void onTrafficLightClicked(long long id);
     void cycleTrafficLightState(long long id);
+    void onOSMLoadingFinished();
 
+//METHODS
+private:
+    LightState getTrafficLightStateAtPosition(const QPointF& position, qreal radius);
+    void spawnVehicle();
+    void updateVehicleGraphics();
+
+//MEMBERS
 private:
     QGraphicsScene *m_scene;
     QMap<int, QGraphicsEllipseItem*> m_nodeItems;
@@ -70,7 +82,7 @@ private:
 
     QColor colorForState(LightState state);
 
-    RoadGraph m_roadGraph;
+    RoadGraph* m_roadGraph;
     QTimer m_simulationTimer;
     QElapsedTimer m_elapsedTimer;
     double m_lastUpdateTime;
@@ -78,7 +90,6 @@ private:
 
     void drawRoadGraph();
     QPointF getNodePosition(int nodeId) const;
-    void updateVehicleGraphics();
     QPointF latLonToScene(double lat, double lon) const;
 
     // Вспомогательные методы парсинга
@@ -111,6 +122,13 @@ private:
     QMap<long long, QPointF> m_tempNodes; // Временные узлы текущей порции
     QList<PendingWay> m_tempWays;         // Временные дороги текущей порции
     int m_internalIdCounter;              // Счетчик внутренних ID
+
+    // МАШИНЫ
+    QTimer m_vehicleSpawnTimer;
+    int m_vehicleCounter{0};
+    int m_edgeIdCounter{1};
+signals:
+    void osmLoadingFinished();
 };
 
 #endif // SIMULATIONVIEW_H

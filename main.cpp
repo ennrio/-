@@ -48,9 +48,9 @@ int main(int argc, char *argv[])
     view.show();
 
 
-    // Добавляем машину в центр
-    view.addVehicle(1, QPointF(0, 0));
-    view.startSimulation();
+    // // Добавляем машину в центр
+    // view.addVehicle(1, QPointF(0, 0));
+    // view.startSimulation();
 
     return a.exec();
 }

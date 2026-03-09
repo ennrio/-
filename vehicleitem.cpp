@@ -19,14 +19,15 @@ VehicleItem::VehicleItem(Vehicle* vehicle, QGraphicsItem* parent)
     updatePosition();
 }
 
+void VehicleItem::setColor(const QColor &color)
+{
+    setBrush(QBrush(color));
+}
+
 void VehicleItem::updatePosition()
 {
     QPointF pos = m_vehicle->position();
     setPos(pos);
-
-    // Поворачиваем транспорт по направлению движения
-    double degrees = m_vehicle->heading() * 180.0 / M_PI;
-    setRotation(degrees);
 }
 
 void VehicleItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)

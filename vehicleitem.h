@@ -14,6 +14,7 @@ public:
     VehicleItem(Vehicle* vehicle, QGraphicsItem* parent = nullptr);
 
     Vehicle* vehicle() const { return m_vehicle; }
+    void setColor(const QColor& color);
 
     // QGraphicsItem override
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;

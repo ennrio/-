@@ -1,41 +1,48 @@
 #ifndef ROADGRAPH_H
 #define ROADGRAPH_H
 
-#include<QMap>
-#include<iostream>
-#include<queue>
-#include<QPointF>
-//узел дороги
-struct Node{
+#include <QMap>
+#include <QPointF>
+#include <QList>
+#include <queue>
+#include <limits>
+
+struct Node {
     int id;
-    double x,y;
+    double x, y;
 };
 
-// сегмент между двумя зулами
-struct Edge{
+struct Edge {
     int id;
     int fromNodeId;
     int toNodeId;
     double length;
-    int lanes;
-    double speedLimit;
+    int lanes{1};
+    double speedLimit{50.0}; // км/ч
 };
 
-
-//граф дорог
-class RoadGraph{
+class RoadGraph {
     QMap<int, Node> nodes;
     QMap<int, Edge> edges;
-    QMap<int, QList<int>> adjacencyList;
+    QMap<int, QList<int>> adjacencyList;  // node_id -> список соседних node_id
+
 public:
-    void addNode(int _id, double _x, double _y);
+    void addNode(int id, double x, double y);
 
-    void addEdge(int _id, double _from, int _to, double _length);
+    void addEdge(int id, int fromNodeId, int toNodeId, double length, bool bidirectional = true);
 
-    QPointF getNodePosition(int node_id) const;
-
+    QPointF getNodePosition(int nodeId) const;
     QList<int> findRoute(int startNode, int endNode);
+
+    // Для отладки
+    bool hasNode(int id) const { return nodes.contains(id); }
+    bool hasEdge(int id) const { return edges.contains(id); }
+    QList<int> getNeighbors(int nodeId) const;
+
     void clear();
+    QMap<int, Node> getNodes() const { return nodes; }
+    int nodeCount() const { return nodes.size(); }
+    int edgeCount() const { return edges.size(); }
 };
 
 #endif // ROADGRAPH_H
