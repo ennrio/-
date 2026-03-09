@@ -13,6 +13,7 @@
 
 
 
+
 SimulationView::SimulationView(QWidget *parent)
     : QGraphicsView(parent)
     , m_scene(new QGraphicsScene(this))
@@ -242,6 +243,55 @@ void SimulationView::updateSimulation()
 
     // Обновляем сцену
     m_scene->update();
+}
+
+void SimulationView::onTrafficLightClicked(long long id)
+{
+    qDebug() << "Traffic light clicked:" << id;
+    cycleTrafficLightState(id);
+}
+
+void SimulationView::cycleTrafficLightState(long long id)
+{
+    if (!m_controllers.contains(id) || !m_trafficLights.contains(id)) {
+        return;
+    }
+
+    setTrafficLightManualMode(id, true);
+
+    QTimer::singleShot(30000, this, [this, id]() {
+        setTrafficLightManualMode(id, false);
+    });
+
+    auto* controller = m_controllers[id];
+    auto* trafficLight = m_trafficLights[id];
+
+    // Получаем текущее состояние
+    LightState currentState = trafficLight->state();
+
+    // Циклически переключаем: Red -> Green -> Yellow -> Red
+    LightState nextState;
+    switch (currentState) {
+    case LightState::Red:
+        nextState = LightState::Green;
+        break;
+    case LightState::Green:
+        nextState = LightState::Yellow;
+        break;
+    case LightState::Yellow:
+        nextState = LightState::Red;
+        break;
+    default:
+        nextState = LightState::Red;
+    }
+
+    // Принудительно устанавливаем состояние на 30 секунд
+    // После этого вернётся автоматический режим
+    controller->forceState(nextState, 30000);
+
+    qDebug() << "Traffic light" << id
+             << "manually changed to" << static_cast<int>(nextState)
+             << "(will auto-resume in 30s)";
 }
 
 QColor SimulationView::colorForState(LightState state)
@@ -614,9 +664,17 @@ void SimulationView::processOsmChunk()
                             m_controllers[tl->id()] = controller;
 
                             // Визуализация
-                            auto* item = new QGraphicsEllipseItem(-6, -6, 12, 12);
+                            auto* item = new TrafficLightItem(
+                                tl->id(),
+                                [this](long long id) {
+                                    onTrafficLightClicked(id);  // ✅ Вызов метода SimulationView
+                                },
+                                nullptr  // родитель будет сцена при addItem
+                                );
                             item->setPos(scenePos);
                             item->setBrush(QBrush(colorForState(tl->state())));
+                            item->setPen(QPen(Qt::black, 2));
+                            item->setZValue(10);
                             m_scene->addItem(item);
                             m_trafficLightItems[tl->id()] = item;
 
@@ -733,6 +791,23 @@ void SimulationView::processOsmChunk()
         }
     } else {
         QTimer::singleShot(0, this, &SimulationView::processOsmChunk);
+    }
+}
+
+void SimulationView::setTrafficLightManualMode(long long id, bool manual)
+{
+    if (!m_trafficLightItems.contains(id)) {
+        return;
+    }
+
+    auto* item = m_trafficLightItems[id];
+
+    if (manual) {
+        // Жёлтая обводка = ручной режим
+        item->setPen(QPen(Qt::yellow, 3));
+    } else {
+        // Чёрная обводка = автоматический режим
+        item->setPen(QPen(Qt::black, 2));
     }
 }
 

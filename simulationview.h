@@ -14,6 +14,7 @@
 #include <QXmlStreamReader>
 #include "trafficlight.h"
 #include "trafficlightcontroller.h"
+#include "trafficlightitem.h"
 
 struct PendingWay {
     QList<long long> nodeRefs;
@@ -49,6 +50,10 @@ protected:
 
 private slots:
     void updateSimulation();
+
+    // обработка кликов по светофору
+    void onTrafficLightClicked(long long id);
+    void cycleTrafficLightState(long long id);
 
 private:
     QGraphicsScene *m_scene;
@@ -86,6 +91,8 @@ private:
     // Методы для потоковой обработки
     void startStreamingLoad(const QString &filename);
     void processOsmChunk();
+
+    void setTrafficLightManualMode(long long id, bool manual);
 
     // --- ПЕРЕМЕННЫЕ ДЛЯ ПОТОКОВОЙ ЗАГРУЗКИ ---
 

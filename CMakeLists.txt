@@ -19,6 +19,7 @@ qt_add_executable(asudd
     trafficlight.h trafficlight.cpp
     trafficlightcontroller.h trafficlightcontroller.cpp
     intersectioncontroller.h intersectioncontroller.cpp
+    trafficlightitem.h trafficlightitem.cpp
 )
 
 target_link_libraries(asudd
