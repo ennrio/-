@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
 project(asudd LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Concurrent Widgets)
+
 
 qt_standard_project_setup()
 
@@ -25,6 +26,7 @@ qt_add_executable(asudd
 target_link_libraries(asudd
     PRIVATE
         Qt::Core
+        Qt6::Concurrent
         Qt::Widgets
 )
 

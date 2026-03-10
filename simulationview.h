@@ -14,11 +14,13 @@
 #include <QXmlStreamReader>
 #include "trafficlight.h"
 #include "trafficlightcontroller.h"
-#include "trafficlightitem.h"
+#include <QtConcurrent>
+#include <QFutureWatcher>
 
 struct PendingWay {
     QList<long long> nodeRefs;
     QString highwayType;
+    bool isOneWay{false};
 };
 
 class SimulationView : public QGraphicsView
@@ -59,12 +61,16 @@ private slots:
     void onTrafficLightClicked(long long id);
     void cycleTrafficLightState(long long id);
     void onOSMLoadingFinished();
+    void spawnVehicle();
+    void onRouteCalculationFinished();
 
 //METHODS
 private:
+    QList<QPointF> calculateRouteAsync();
     LightState getTrafficLightStateAtPosition(const QPointF& position, qreal radius);
-    void spawnVehicle();
     void updateVehicleGraphics();
+    QFutureWatcher<QList<QPointF>>* m_routeCalculationWatcher;
+
 
 //MEMBERS
 private:

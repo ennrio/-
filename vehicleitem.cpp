@@ -6,9 +6,9 @@ VehicleItem::VehicleItem(Vehicle* vehicle, QGraphicsItem* parent)
     : QGraphicsEllipseItem(parent)
     , m_vehicle(vehicle)
 {
-    // Устанавливаем размер и цвет транспортного средства
+    // цвет машины
     setRect(-5, -5, 10, 10); // Круг радиусом 5
-    m_color = QColor(255, 0, 0); // Красный цвет
+    setBrush(QBrush(QColor(128, 0, 128)));  // Красный цвет
     m_pen = QPen(Qt::black, 1);
     m_brush = QBrush(m_color);
 
