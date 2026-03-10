@@ -39,7 +39,7 @@ void debugHandler(QtMsgType type, const QMessageLogContext &context, const QStri
 int main(int argc, char *argv[])
 {
     qInstallMessageHandler(debugHandler);
-    qDebug() << "fjdsdfafads";
+    qDebug() << "green";
     QApplication a(argc, argv);
     setDarkPalette(a);
     SimulationView view;
