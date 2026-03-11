@@ -8,19 +8,19 @@ qt_standard_project_setup()
 
 qt_add_executable(asudd
     WIN32 MACOSX_BUNDLE
-    main.cpp
-    mainwindow.cpp
     mainwindow.h
     mainwindow.ui
-    vehicle.h vehicle.cpp
-    vehicleitem.h vehicleitem.cpp
-    simulationview.h simulationview.cpp
-    roadgraph.h roadgraph.cpp
-    osmparser.h osmparser.cpp
-    trafficlight.h trafficlight.cpp
-    trafficlightcontroller.h trafficlightcontroller.cpp
-    intersectioncontroller.h intersectioncontroller.cpp
-    trafficlightitem.h trafficlightitem.cpp
+    main.cpp
+    mainwindow.cpp
+    visualization/vehicle.h visualization/vehicle.cpp
+    visualization/vehicleitem.h visualization/vehicleitem.cpp
+    visualization/simulationview.h visualization/simulationview.cpp
+    visualization/roadgraph.h visualization/roadgraph.cpp
+    visualization/osmparser.h visualization/osmparser.cpp
+    visualization/trafficlight.h visualization/trafficlight.cpp
+    visualization/trafficlightcontroller.h visualization/trafficlightcontroller.cpp
+    visualization/intersectioncontroller.h visualization/intersectioncontroller.cpp
+    visualization/trafficlightitem.h visualization/trafficlightitem.cpp
 )
 
 target_link_libraries(asudd
