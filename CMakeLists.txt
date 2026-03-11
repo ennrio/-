@@ -25,6 +25,7 @@ qt_add_executable(asudd
     trafficlightcontrolwidget.h trafficlightcontrolwidget.cpp
     datageneratorwidget.h datageneratorwidget.cpp
     analyticswidget.h analyticswidget.cpp
+    registerdialog.h registerdialog.cpp
 )
 
 target_link_libraries(asudd

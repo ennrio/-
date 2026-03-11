@@ -6,11 +6,16 @@
 #include <QPushButton>
 #include <QFont>
 #include <QColor>
+#include <QMessageBox>
+#include <QTimer>
+
+#include "registerdialog.h"
 
 MainScreenWidget::MainScreenWidget(QWidget *parent)
     : QWidget(parent)
 {
     setStyleSheet("background-color: #2B2B2B; color: #FFFFFF;");
+
 
     // === Общая структура ===
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
@@ -36,18 +41,21 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     QVBoxLayout *sessionLayout = new QVBoxLayout(sessionBox);
     sessionLayout->setContentsMargins(10, 10, 10, 10);
 
-    QLabel *operatorLabel = new QLabel("Оператор: Иванов А.С.");
-    operatorLabel->setStyleSheet("font-size: 13px;");
 
-    QLabel *startTimeLabel = new QLabel("Начало смены: 22.10.2025 08:00");
-    startTimeLabel->setStyleSheet("font-size: 13px;");
+    m_operatorLabel = new QLabel("Оператор: " + name + " (" + role + ")");
+    m_operatorLabel->setStyleSheet("font-size: 13px;");
 
-    QLabel *durationLabel = new QLabel("Длительность: 4 ч 30 мин");
-    durationLabel->setStyleSheet("font-size: 13px;");
+    m_startTimeLabel = new QLabel("Начало смены: " + startTime);
+    m_startTimeLabel->setStyleSheet("font-size: 13px;");
 
-    sessionLayout->addWidget(operatorLabel);
-    sessionLayout->addWidget(startTimeLabel);
-    sessionLayout->addWidget(durationLabel);
+    m_durationLabel = new QLabel(QString("Длительность: %1 ч %2 мин")
+                                     .arg(hours).arg(minutes, 2, 10, QChar('0')));
+    m_durationLabel->setStyleSheet("font-size: 13px;");
+ъ
+
+    sessionLayout->addWidget(m_operatorLabel);
+    sessionLayout->addWidget(m_startTimeLabel);
+    sessionLayout->addWidget(m_durationLabel);
     mainLayout->addWidget(sessionBox);
 
     // === Показатели ЦУДД ===
@@ -166,8 +174,57 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     actionsLayout->addWidget(btnDiagnostic);
     mainLayout->addWidget(actionsBox);
 
+
+    connect(btnNewShift, &QPushButton::clicked, this, &MainScreenWidget::onStartNewShift);
     // Загружаем
     m_simulationView->setWindowTitle("Тест");
     m_simulationView->resize(600, 400);
     m_simulationView->show();
+
+}
+
+void MainScreenWidget::onStartNewShift()
+{
+    RegisterDialog dialog(this);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        // Регистрация успешна — обновляем интерфейс
+        this->name = dialog.operatorName();
+        this->role = dialog.operatorRole();
+        this->startTime = QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm");
+
+        this->m_operatorLabel->setText("Оператор: " + name + " (" + role + ")");
+        this->m_startTimeLabel->setText("Начало смены: " + startTime);
+
+        m_shiftTimer = new QTimer(this); // родитель this — таймер удалится автоматически
+        m_shiftStartTime = QDateTime::currentDateTime(); // сохраняем время начала
+
+        connect(m_shiftTimer, &QTimer::timeout, this, [this]() {
+            // Этот код выполняется каждый тик таймера
+            qint64 seconds = m_shiftStartTime.secsTo(QDateTime::currentDateTime());
+            this->hours = seconds / 3600;
+            this->minutes = (seconds % 3600) / 60;
+
+            m_durationLabel->setText(QString("Длительность: %1 ч %2 мин")
+                                         .arg(hours).arg(minutes, 2, 10, QChar('0')));
+        });
+
+        m_shiftTimer->start(60000);
+        // this->durationLabel->setText("Длительность: 0 ч 0 мин");
+
+
+        // Пример вывода в консоль для отладки:
+        qDebug() << "Новая смена:" << name << role << startTime;
+
+        // Показываем уведомление
+        QMessageBox::information(this, "Смена начата",
+                                 "Оператор: " + name + "\n"
+                                                       "Роль: " + role + "\n"
+                                              "Время начала: " + startTime);
+
+        // TODO
+        // 1. Сохранить данные в БД
+        // 2. Сбросить статистику предыдущей смены
+        // 3. Запустить таймер длительности смены
+    }
 }

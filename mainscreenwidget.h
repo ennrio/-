@@ -10,6 +10,7 @@
 #include <QScrollArea>
 #include <QTreeWidget>
 #include <QTabWidget>
+#include <QTimer>
 #include "visualization/simulationview.h"
 
 class MainScreenWidget : public QWidget
@@ -41,6 +42,18 @@ private:
 
     // Карта (ваша SimulationView)
     QWidget *m_mapContainer;
+
+    QTimer *m_shiftTimer;
+    QDateTime m_shiftStartTime;
+
+    // регистрационные параметры
+    QString name = "";
+    QString role = "";
+    QString startTime = "";
+    int hours = 0;
+    int minutes = 0;
+private slots:
+    void onStartNewShift();
 };
 
 #endif // MAINSCREENWIDGET_H
