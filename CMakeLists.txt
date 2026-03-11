@@ -21,6 +21,10 @@ qt_add_executable(asudd
     visualization/trafficlightcontroller.h visualization/trafficlightcontroller.cpp
     visualization/intersectioncontroller.h visualization/intersectioncontroller.cpp
     visualization/trafficlightitem.h visualization/trafficlightitem.cpp
+    mainscreenwidget.h mainscreenwidget.cpp
+    trafficlightcontrolwidget.h trafficlightcontrolwidget.cpp
+    datageneratorwidget.h datageneratorwidget.cpp
+    analyticswidget.h analyticswidget.cpp
 )
 
 target_link_libraries(asudd

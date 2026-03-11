@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QList>
 #include <QPalette>
+#include "mainwindow.h"
 
 void setDarkPalette(QApplication &app)
 {
@@ -42,15 +43,20 @@ int main(int argc, char *argv[])
     qDebug() << "хочу квадратик 2";
     QApplication a(argc, argv);
     setDarkPalette(a);
-    SimulationView view;
-    view.setWindowTitle("Тест");
-    view.resize(600, 400);
-    view.show();
+
+
+    // SimulationView view;
+    // view.setWindowTitle("Тест");
+    // view.resize(600, 400);
+    // view.show();
 
 
     // // Добавляем машину в центр
     // view.addVehicle(1, QPointF(0, 0));
     // view.startSimulation();
+
+    MainWindow w;
+    w.show();
 
     return a.exec();
 }
