@@ -27,6 +27,8 @@ private:
     QCheckBox *m_equipmentCheck;
     QComboBox *m_frequencyCombo;
     QPushButton *m_startBtn, *m_stopBtn, *m_generateBtn;
+private slots:
+    void stopGeneration();
 };
 
 #endif // DATAGENERATORWIDGET_H

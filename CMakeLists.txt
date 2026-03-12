@@ -26,6 +26,7 @@ qt_add_executable(asudd
     datageneratorwidget.h datageneratorwidget.cpp
     analyticswidget.h analyticswidget.cpp
     registerdialog.h registerdialog.cpp
+    simulationmanager.h simulationmanager.cpp
 )
 
 target_link_libraries(asudd

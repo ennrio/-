@@ -10,6 +10,7 @@
 #include <QTimer>
 
 #include "registerdialog.h"
+#include "simulationmanager.h"
 
 MainScreenWidget::MainScreenWidget(QWidget *parent)
     : QWidget(parent)
@@ -51,7 +52,7 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     m_durationLabel = new QLabel(QString("Длительность: %1 ч %2 мин")
                                      .arg(hours).arg(minutes, 2, 10, QChar('0')));
     m_durationLabel->setStyleSheet("font-size: 13px;");
-ъ
+    onStartNewShift();
 
     sessionLayout->addWidget(m_operatorLabel);
     sessionLayout->addWidget(m_startTimeLabel);
@@ -120,6 +121,7 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     m_simulationView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_simulationView->setStyleSheet("background-color: #1E1E1E;");
     mainLayout->addWidget(m_simulationView, 1); // stretch factor = 1
+    SimulationManager::instance().setSimulationView(m_simulationView);
 
     // === Быстрые действия ===
     QGroupBox *actionsBox = new QGroupBox("Быстрые действия");

@@ -191,6 +191,7 @@ void SimulationView::startSimulation()
 void SimulationView::stopSimulation()
 {
     m_simulationTimer.stop();
+    m_vehicleSpawnTimer.stop();
     qDebug() << "Simulation stopped";
 }
 

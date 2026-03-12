@@ -4,6 +4,7 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
+#include "simulationmanager.h"
 
 DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     : QWidget(parent)
@@ -153,7 +154,18 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     btnLayout->addWidget(m_stopBtn);
     btnLayout->addWidget(m_generateBtn);
 
+
     settingsLayout->addLayout(btnLayout);
     settingsGroupBox->setLayout(settingsLayout);
     mainLayout->addWidget(settingsGroupBox);
+
+    connect(m_stopBtn, &QPushButton::clicked, this, &DataGeneratorWidget::stopGeneration);
+}
+
+void DataGeneratorWidget::stopGeneration()
+{
+    SimulationView* view = SimulationManager::instance().simulationView();
+    if (view) {
+        view->stopSimulation();
+    }
 }
