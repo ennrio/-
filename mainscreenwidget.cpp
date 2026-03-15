@@ -91,7 +91,7 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     // Загруженность дорог
     QLabel *loadLabel = new QLabel("Загруженность дорог");
     loadLabel->setStyleSheet("color: #FF9900; font-weight: bold;");
-    QLabel *loadCount = new QLabel("72% ▼ 8% с утра");
+    loadCount = new QLabel("72% ▼ 8% с утра");
     loadCount->setStyleSheet("color: #FF9900; font-size: 12px;");
     metricsLayout->addWidget(loadLabel, 3, 0);
     metricsLayout->addWidget(loadCount, 3, 1);
@@ -239,7 +239,17 @@ void MainScreenWidget::onStartNewShift()
 
 void MainScreenWidget::updateMainScreen()
 {
-    devicesCount->setText(QString::number(m_simulationView->getActiveVehicleCount())+"/"
+    int count_vechicle = 0;
+    if(m_simulationView){
+        count_vechicle = m_simulationView->getActiveVehicleCount();
+        this->maxCountVehicle = qMax(count_vechicle,maxCountVehicle);
+    }
+    devicesCount->setText(QString::number(count_vechicle)+"/"
                           +QString::number(m_simulationView->getVehicleCount()) + " активных авто");
-    speedCount->setText(QString::number(m_simulationView->getAverageSpeed()) + "км/ч");
+    int loading_road = 100;
+    if(count_vechicle && maxCountVehicle){ // TODO можно оптимизировать
+        loading_road = count_vechicle/maxCountVehicle * 100;
+    }
+    loadCount->setText(QString::number(loading_road) + " %"); //TODO нужно брать значение от истор максимума или от среднеквадратичного отклонения, по хорошему вообще расчитывать для каждой дороги по отдельности
+    speedCount->setText(QString::number(m_simulationView->getAverageSpeed()) + " км/ч");
 }
