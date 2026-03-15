@@ -585,9 +585,9 @@ void SimulationView::parseOSMFile(const QString &filename)
                 auto* tl = new TrafficLight(id, scenePos, direction, isPedestrian, this);
                 m_trafficLights[tl->id()] = tl;
 
-                auto* controller = new TrafficLightController(tl, this);
-                controller->setStandardCycle(30000, 5000, 25000); // зелёный/жёлтый/красный
-                m_controllers[tl->id()] = controller;
+                auto* light_controller = new TrafficLightController(tl, this);
+                light_controller->setStandardCycle(30000, 5000, 25000); // зелёный/жёлтый/красный
+                m_controllers[tl->id()] = light_controller;
 
                 auto* item = new QGraphicsEllipseItem(-6, -6, 12, 12);
                 item->setPos(scenePos);
@@ -919,6 +919,7 @@ void SimulationView::processOsmChunk()
                         if (isTrafficLight) {
                             auto* tl = new TrafficLight(id, scenePos, direction, isPedestrian, this);
                             m_trafficLights[tl->id()] = tl;
+                            m_trafficLightOsmId[tl->id()] = id;
 
                             // Создаём контроллер с дефолтным циклом
                             auto* controller = new TrafficLightController(tl, this);
@@ -981,6 +982,7 @@ void SimulationView::processOsmChunk()
                 QString highwayType;
                 bool isRoad = false;
                 bool isOneWay = false;
+                QString wayName;
 
                 while (!(m_xmlReader.isEndElement() && m_xmlReader.name() == QLatin1String("way"))) {
                     m_xmlReader.readNext();
@@ -999,6 +1001,10 @@ void SimulationView::processOsmChunk()
                                 }
                             }
 
+                            else if (key == "name") {
+                                wayName = value;
+                            }
+
                             //  ПРОВЕРКА НА ОДНОСТОРОННЕЕ ДВИЖЕНИЕ
                             else if (key == "oneway") {
                                 if (value == "yes" || value == "1" || value == "true") {
@@ -1012,8 +1018,14 @@ void SimulationView::processOsmChunk()
                     }
                 }
 
-
-
+                //парсинг для ночного режима сценарий из ПДД (п. 13.3 ПДД РФ) //TODO config_file
+                bool isMainStreet = (wayName == "Невский проспект" || wayName == "Nevsky Prospekt" ||
+                                     wayName == "Московский проспект" || wayName == "Moskovsky Prospekt");
+                if (isMainStreet) {
+                    for (long long nodeId : nodeRefs) {
+                        m_mainStreetNodeIds.insert(nodeId);
+                    }
+                }
 
 
                 if (isRoad && nodeRefs.size() >= 2) {
@@ -1119,4 +1131,69 @@ void SimulationView::loadOSM(const QString &filename)
 QPointF SimulationView::convertLatLon(double lat, double lon) const
 {
     return latLonToScene(lat, lon);
+}
+
+void SimulationView::setLightAutoMode()
+{
+
+}
+
+void SimulationView::setLightManualOperation()
+{
+
+}
+
+void SimulationView::setLightNightMode()
+{
+    lm = LightMode::nightMode;
+    qDebug() << "Всего светофоров в системе:" << m_trafficLights.size();
+    qDebug() << "Записей в карте связи (TL ID -> OSM ID):" << m_trafficLightOsmId.size();
+    qDebug() << "Узлов Невского проспекта в списке:" << m_mainStreetNodeIds.size();
+
+    if (!m_mainStreetNodeIds.isEmpty()) {
+        qDebug() << "Пример IDs узлов Невского (первые 5):"
+                 << m_mainStreetNodeIds.values().mid(0, 5);
+    }
+    //
+
+    qint64 infiniteDuration = 3600000; // TODO обратный вызов для сброса режима
+
+    int countBlinking = 0;
+    int countNormal = 0;
+
+    for (auto it = m_trafficLights.begin(); it != m_trafficLights.end(); ++it) {
+        TrafficLight* tl = it.value();
+        TrafficLightController* controller = m_controllers.value(tl->id());
+        if (!controller) continue;
+
+        // Проверяем, стоит ли светофор на главной улице (Невский)
+        // Нам нужно знать OSM ID этого светофора.
+        long long osmNodeId = m_trafficLightOsmId.value(tl->id(), -1);
+        bool isOnMainStreet = m_mainStreetNodeIds.contains(osmNodeId);
+
+        if (isOnMainStreet) {
+            // === НЕВСКИЙ ПРОСПЕКТ ===
+            // Оставляем автоматический режим (сброс форсирования)
+            controller->restartCycle();
+
+            // Визуально: обычная рамка или синяя
+            if (m_trafficLightItems.contains(tl->id())) {
+                m_trafficLightItems[tl->id()]->setPen(QPen(Qt::blue, 2));
+            }
+            countNormal++;
+        } else {
+
+            controller->forceState(LightState::Yellow, infiniteDuration);
+
+            controller->setNightMode(true);
+
+            if (m_trafficLightItems.contains(tl->id())) {
+                m_trafficLightItems[tl->id()]->setPen(QPen(Qt::yellow, 4));
+            }
+            countBlinking++;
+        }
+    }
+
+    qDebug() << "Ночной режим активирован. Мигают желтым:" << countBlinking
+             << ", Работают обычно (Невский):" << countNormal;
 }

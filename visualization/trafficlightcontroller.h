@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QTimer>
 #include "trafficlight.h"
+#include "../constants.h"
 
 struct PhaseConfig {
     LightState state;
@@ -24,6 +25,9 @@ public:
     void forceState(LightState state, int durationMs = -1); // -1 = до отмены
     void resumeAutomatic();
 
+    void restartCycle();
+    void setNightMode(bool enable);
+
     LightState currentState() const;
 
 signals:
@@ -32,15 +36,18 @@ signals:
 
 private slots:
     void onPhaseTimeout();
+    void onBlinkTimeout();
 
 private:
     TrafficLight* m_light;
     QTimer m_phaseTimer;
+    QTimer m_blinkTimer;
     QVector<PhaseConfig> m_phases;
     int m_currentPhaseIndex{0};
 
     bool m_manualOverride{false};
     LightState m_overrideState{LightState::Red};
+    LightMode lm;
 
     void startPhase(int index);
 };

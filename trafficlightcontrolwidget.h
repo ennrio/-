@@ -9,6 +9,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QComboBox>
+#include "visualization/simulationview.h"
 
 
 class TrafficLightControlWidget : public QWidget
@@ -22,16 +23,19 @@ private slots:
     void onModeChanged(const QString &modeText);
 
 private:  
-    QGroupBox *m_crossingListGroupBox;
     QListWidget *m_crossingList;
+    QGroupBox *m_crossingListGroupBox;
     QGroupBox *m_controlGroupBox;
+    QGroupBox *m_paramsGroupBox;
+    QGroupBox *m_priorityGroupBox;
     QComboBox *m_modeComboBox;
     QLabel *m_greenLabel, *m_yellowLabel, *m_redLabel;
     QLabel *statusLabel;
     QLineEdit *m_greenInput, *m_yellowInput, *m_redInput;
-    QGroupBox *m_priorityGroupBox;
     QListWidget *m_priorityList;
     QPushButton *m_applyButton, *m_resetButton, *m_diagnosticsButton;
+    LightMode lm;
+    SimulationView* sv;
 };
 
 #endif // TRAFFICLIGHTCONTROLWIDGET_H

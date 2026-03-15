@@ -16,12 +16,15 @@
 #include "trafficlightcontroller.h"
 #include <QtConcurrent>
 #include <QFutureWatcher>
+#include "../constants.h"
 
 struct PendingWay {
     QList<long long> nodeRefs;
     QString highwayType;
     bool isOneWay{false};
 };
+
+
 
 class SimulationView : public QGraphicsView
 {
@@ -52,6 +55,11 @@ public:
     void drawRoad(long long fromId, long long toId, const QString &type);
     double calculateDistance(double lat1, double lon1, double lat2, double lon2);
     QPointF convertLatLon(double lat, double lon) const;
+
+    //управление свотофорами
+    void setLightAutoMode();
+    void setLightManualOperation();
+    void setLightNightMode();
 
 //MEMBERS
 public:
@@ -86,6 +94,8 @@ private:
     QMap<long long, QPointF> m_nodePositions; // кэш позиций узлов в сцене
     QMap<long long, int> m_osmToInternalId;      // Маппинг: OSM ID → внутренний ID
     QMap<long long, QPointF> m_osmNodePositions;
+    QSet<long long> m_mainStreetNodeIds;
+    QMap<int, long long> m_trafficLightOsmId;
     QMap<int, TrafficLight*> m_trafficLights; // Кэш светофоров
     QMap<int, QGraphicsEllipseItem*> m_trafficLightItems; // view
     QMap<int, TrafficLightController*> m_controllers;  // логика
@@ -108,6 +118,7 @@ private:
     void drawOSMRoad(const QList<long long> &nodeRefs, const QString &highwayType);
 
     void loadOSM(const QString &filename);
+    LightMode lm;
 
 
     // Методы для потоковой обработки

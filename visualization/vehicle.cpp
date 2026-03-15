@@ -37,6 +37,18 @@ void Vehicle::markRouteFinished()
              << QDateTime::fromMSecsSinceEpoch(m_finishedTimestamp).toString("hh:mm:ss");
 }
 
+void Vehicle::setNightMode(bool enabled)
+{
+    if(enabled){
+        lm = nightMode;
+    }
+}
+
+bool Vehicle::isNightMode() const
+{
+    return lm == LightMode::nightMode;
+}
+
 void Vehicle::setTrafficLightChecker(TrafficLightChecker checker)
 {
     m_trafficLightChecker = checker;
@@ -44,60 +56,104 @@ void Vehicle::setTrafficLightChecker(TrafficLightChecker checker)
 
 void Vehicle::update(double deltaTime)
 {
-    if (m_route.isEmpty() || m_currentRouteIndex >= m_route.size()) {
-        return;
-    }
-
+    // === БАЗОВЫЕ ПРОВЕРКИ ===
     if (m_route.isEmpty() || m_currentRouteIndex >= m_route.size()) {
         markRouteFinished();
         return;
     }
-    // === ПРОВЕРКА СВЕТОФОРА ===
-    if (m_trafficLightAware && m_stoppedAtLightId < 0) {
-        if (checkTrafficLightAhead()) {
-            // Светофор найден и требует остановки — тормозим
-            applyBraking(deltaTime);
-            if (m_speed < 0.1) {
-                m_speed = 0;
-                // emit stoppedAtLight(m_id, m_stoppedAtLightId);
-                qDebug() << "Vehicle" << m_id << "stopped at light" << m_stoppedAtLightId;
+
+    // Получаем состояние светофора впереди
+    LightState currentLightState = LightState::Green;
+    bool isLightAhead = false;
+
+    if (m_trafficLightAware && m_trafficLightChecker) {
+        currentLightState = m_trafficLightChecker(m_position, 15.0);
+        isLightAhead = (currentLightState != LightState::Off);
+    }
+
+    // ==========================================
+    // РЕШЕНИЕ: ТОРМОЗИТЬ ИЛИ ЕХАТЬ?
+    // ==========================================
+
+    bool mustStop = false;
+
+    if (isNightMode()) {
+        // Стоим ТОЛЬКО если горит КРАСНЫЙ (на Невском проспекте).
+        // На мигающий ЖЕЛТЫЙ не реагируем как на запрет - просто едем.
+        if (currentLightState == LightState::Red) {
+            mustStop = true;
+        } else {
+            mustStop = false; // Желтый или Зеленый - едем свободно
+        }
+    }
+    else {
+        // Стоим на Красный и Желтый
+        if (currentLightState == LightState::Red || currentLightState == LightState::Yellow) {
+            mustStop = true;
+        } else {
+            mustStop = false;
+        }
+    }
+
+
+    if (mustStop) {
+        if (m_stoppedAtLightId < 0) {
+            m_stoppedAtLightId = -2; // Флаг "остановлен светофором"
+        }
+
+        applyBraking(deltaTime);
+        if (m_speed < 0.1) {
+            m_speed = 0;
+        }
+        emit positionChanged(m_id, m_position);
+        return; // Выход, так как мы стоим
+    }
+
+    if (m_stoppedAtLightId < 0) {
+        // Мы не остановлены, просто продолжаем движение
+    } else {
+        bool canGo = false;
+        if (isNightMode()) {
+            if (currentLightState == LightState::Yellow || currentLightState == LightState::Green) {
+                canGo = true;
             }
+        } else {
+            if (currentLightState == LightState::Green) {
+                canGo = true;
+            }
+        }
+
+        if (canGo) {
+            m_stoppedAtLightId = -1; // Сброс флага остановки
+            // qDebug() << "Vehicle" << m_id << "started from light";
+        } else {
+            // Все еще ждем разрешающего сигнала
+            applyBraking(deltaTime);
+            if (m_speed < 0.1) m_speed = 0;
             emit positionChanged(m_id, m_position);
             return;
         }
     }
 
-    // === ПРОВЕРКА ЗАВЕРШЕНИЯ МАРШРУТА ===
-    if (distanceToNextPoint() < 1.0) {
-        m_currentRouteIndex++;
-        if (m_currentRouteIndex >= m_route.size()) {
-            qDebug() << "Vehicle" << m_id << "reached destination";
-            markRouteFinished();
-            emit positionChanged(m_id, m_position);
-            return;
+    // 3. Движение и ускорение (теперь всегда полное, без замедления)
+    if (m_stoppedAtLightId < 0) {
+        if (m_speed < m_maxSpeed) {
+            applyAcceleration(deltaTime);
         }
     }
 
-    // === ДВИЖЕНИЕ ===
-    // Если были остановлены у светофора и он зелёный
-    if (m_stoppedAtLightId >= 0 && m_trafficLightChecker) {
-        LightState state = m_trafficLightChecker(m_position, 5.0); // радиус 5м
-        if (state == LightState::Green) {
-            m_stoppedAtLightId = -1;
-            // emit startedFromLight(m_id, -1);
-            qDebug() << "Vehicle" << m_id << "started from light";
-        }
-    }
-
-    // Ускорение если нет препятствий
-    if (m_stoppedAtLightId < 0 && m_speed < m_maxSpeed) {
-        applyAcceleration(deltaTime);
-    }
-
-    // Перемещение
+    // 4. Перемещение
     qreal pixelsPerSecond = m_speed / m_metersPerPixel;
     qreal distancePixels = pixelsPerSecond * deltaTime;
     moveAlongPath(distancePixels);
+
+    // 5. Проверка достижения точки
+    if (distanceToNextPoint() < 1.0) {
+        m_currentRouteIndex++;
+        if (m_currentRouteIndex >= m_route.size()) {
+            markRouteFinished();
+        }
+    }
 
     emit positionChanged(m_id, m_position);
 }

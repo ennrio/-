@@ -21,6 +21,9 @@ TrafficLightController::TrafficLightController(TrafficLight* light, QObject* par
     // Соединяем таймер с обработчиком
     connect(&m_phaseTimer, &QTimer::timeout, this, &TrafficLightController::onPhaseTimeout);
 
+    connect(&m_blinkTimer, &QTimer::timeout, this, &TrafficLightController::onBlinkTimeout);
+    m_blinkTimer.setInterval(800);
+
     // Устанавливаем дефолтный цикл при создании
     setStandardCycle();
 }
@@ -34,6 +37,7 @@ void TrafficLightController::setStandardCycle(int greenMs, int yellowMs, int red
     // Стандартная последовательность для автомобильного светофора:
     // Красный → Зелёный → Жёлтый → (повтор)
     // Примечание: в некоторых странах порядок: Зелёный → Жёлтый → Красный
+    if (lm == LightMode::nightMode) return;
 
     m_phases.clear();
 
@@ -110,6 +114,52 @@ void TrafficLightController::resumeAutomatic()
     }
 }
 
+void TrafficLightController::restartCycle()
+{
+    m_manualOverride = false;
+    if (!m_phases.isEmpty()) {
+        startPhase(m_currentPhaseIndex);
+    }
+}
+
+void TrafficLightController::setNightMode(bool enable)
+{
+    if (enable) {
+        // Включаем ночной режим
+        lm = LightMode::nightMode;
+        m_manualOverride = true;
+        m_overrideState = LightState::Yellow;
+
+        // 1. Устанавливаем желтый цвет сразу
+        m_light->setState(LightState::Yellow);
+        emit phaseChanged(m_light->id(), LightState::Yellow);
+
+        // 2. Останавливаем обычный цикл
+        m_phaseTimer.stop();
+
+        if (m_blinkTimer.interval() <= 0) {
+            m_blinkTimer.setInterval(800);
+        }
+        m_blinkTimer.start();
+
+        qDebug() << "TL" << m_light->id() << ": Night mode ON, blink timer started.";
+    } else {
+        // Выключаем ночной режим
+        lm = LightMode::autoMode; // Или default, смотря как у вас называется обычный режим
+
+        // 1. Останавливаем мигание
+        m_blinkTimer.stop();
+
+        // 2. Сбрасываем ручной режим
+        m_manualOverride = false;
+
+        // 3. Возвращаем обычный цикл
+        restartCycle();
+
+        qDebug() << "TL" << m_light->id() << ": Night mode OFF, auto cycle resumed.";
+    }
+}
+
 LightState TrafficLightController::currentState() const
 {
     if (!m_light) return LightState::Off;
@@ -182,4 +232,17 @@ void TrafficLightController::onPhaseTimeout()
 
     // Запускаем новую фазу
     startPhase(m_currentPhaseIndex);
+}
+
+void TrafficLightController::onBlinkTimeout()
+{
+    if ((lm!=LightMode::nightMode) || !m_light) return;
+
+    // Текущее состояние света
+    LightState current = m_light->state();
+
+    LightState next = (current == LightState::Yellow) ? LightState::Off : LightState::Yellow;
+
+    m_light->setState(next);
+    emit phaseChanged(m_light->id(), next);
 }

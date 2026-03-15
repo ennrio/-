@@ -3,6 +3,7 @@
 #include <QPointF>
 #include <QList>
 #include "trafficlight.h"
+#include "../constants.h"
 
 /*
 ┌─────────────────────────────────────────────────────────┐
@@ -37,6 +38,12 @@ public:
     bool isRouteFinished() const { return m_routeFinished; }
     qint64 finishedTimestamp() const { return m_finishedTimestamp; }
     void markRouteFinished();
+
+    void setNightMode(bool enabled);
+    bool isNightMode() const;
+
+    // Функция проверки помехи справа
+    //bool hasVehicleOnRight() const; TODO (НИКОГДА)
 
     QPointF position() const { return m_position; }
     qreal speed() const { return m_speed; }
@@ -82,4 +89,6 @@ private:
     bool m_active{true};
     bool m_routeFinished{false};
     qint64 m_finishedTimestamp{0};
+
+    LightMode lm;
 };
