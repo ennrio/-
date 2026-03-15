@@ -1133,67 +1133,74 @@ QPointF SimulationView::convertLatLon(double lat, double lon) const
     return latLonToScene(lat, lon);
 }
 
-void SimulationView::setLightAutoMode()
+void SimulationView::setLightMode(LightMode mode)
 {
+    lm = mode;
+    if(lm == nightMode){
+        qDebug() << "Всего светофоров в системе:" << m_trafficLights.size();
+        qDebug() << "Записей в карте связи (TL ID -> OSM ID):" << m_trafficLightOsmId.size();
+        qDebug() << "Узлов Невского проспекта в списке:" << m_mainStreetNodeIds.size();
 
-}
-
-void SimulationView::setLightManualOperation()
-{
-
-}
-
-void SimulationView::setLightNightMode()
-{
-    lm = LightMode::nightMode;
-    qDebug() << "Всего светофоров в системе:" << m_trafficLights.size();
-    qDebug() << "Записей в карте связи (TL ID -> OSM ID):" << m_trafficLightOsmId.size();
-    qDebug() << "Узлов Невского проспекта в списке:" << m_mainStreetNodeIds.size();
-
-    if (!m_mainStreetNodeIds.isEmpty()) {
-        qDebug() << "Пример IDs узлов Невского (первые 5):"
-                 << m_mainStreetNodeIds.values().mid(0, 5);
-    }
-    //
-
-    qint64 infiniteDuration = 3600000; // TODO обратный вызов для сброса режима
-
-    int countBlinking = 0;
-    int countNormal = 0;
-
-    for (auto it = m_trafficLights.begin(); it != m_trafficLights.end(); ++it) {
-        TrafficLight* tl = it.value();
-        TrafficLightController* controller = m_controllers.value(tl->id());
-        if (!controller) continue;
-
-        // Проверяем, стоит ли светофор на главной улице (Невский)
-        // Нам нужно знать OSM ID этого светофора.
-        long long osmNodeId = m_trafficLightOsmId.value(tl->id(), -1);
-        bool isOnMainStreet = m_mainStreetNodeIds.contains(osmNodeId);
-
-        if (isOnMainStreet) {
-            // === НЕВСКИЙ ПРОСПЕКТ ===
-            // Оставляем автоматический режим (сброс форсирования)
-            controller->restartCycle();
-
-            // Визуально: обычная рамка или синяя
-            if (m_trafficLightItems.contains(tl->id())) {
-                m_trafficLightItems[tl->id()]->setPen(QPen(Qt::blue, 2));
-            }
-            countNormal++;
-        } else {
-
-            controller->forceState(LightState::Yellow, infiniteDuration);
-
-            controller->setNightMode(true);
-
-            if (m_trafficLightItems.contains(tl->id())) {
-                m_trafficLightItems[tl->id()]->setPen(QPen(Qt::yellow, 4));
-            }
-            countBlinking++;
+        if (!m_mainStreetNodeIds.isEmpty()) {
+            qDebug() << "Пример IDs узлов Невского (первые 5):"
+                     << m_mainStreetNodeIds.values().mid(0, 5);
         }
-    }
+        //
 
-    qDebug() << "Ночной режим активирован. Мигают желтым:" << countBlinking
-             << ", Работают обычно (Невский):" << countNormal;
+        qint64 infiniteDuration = 3600000; // TODO обратный вызов для сброса режима
+
+        int countBlinking = 0;
+        int countNormal = 0;
+
+        for (auto it = m_trafficLights.begin(); it != m_trafficLights.end(); ++it) {
+            TrafficLight* tl = it.value();
+            TrafficLightController* controller = m_controllers.value(tl->id());
+            if (!controller) continue;
+
+            // Проверяем, стоит ли светофор на главной улице (Невский)
+            // Нам нужно знать OSM ID этого светофора.
+            long long osmNodeId = m_trafficLightOsmId.value(tl->id(), -1);
+            bool isOnMainStreet = m_mainStreetNodeIds.contains(osmNodeId);
+
+            if (isOnMainStreet) {
+                // === НЕВСКИЙ ПРОСПЕКТ ===
+                // Оставляем автоматический режим (сброс форсирования)
+                controller->restartCycle();
+
+                // Визуально: обычная рамка или синяя
+                if (m_trafficLightItems.contains(tl->id())) {
+                    m_trafficLightItems[tl->id()]->setPen(QPen(Qt::blue, 2));
+                }
+                countNormal++;
+            } else {
+
+                controller->forceState(LightState::Yellow, infiniteDuration);
+
+                controller->setMode(lm);
+
+                if (m_trafficLightItems.contains(tl->id())) {
+                    m_trafficLightItems[tl->id()]->setPen(QPen(Qt::yellow, 4));
+                }
+                countBlinking++;
+            }
+        }
+
+        qDebug() << "Ночной режим активирован. Мигают желтым:" << countBlinking
+                 << ", Работают обычно (Невский):" << countNormal;
+    }else{
+        for (auto it = m_controllers.begin(); it != m_controllers.end(); ++it) {
+            TrafficLightController* controller = it.value();
+            long long tlId = it.key();
+
+            controller->restartCycle();
+            controller->setMode(lm);
+
+            if (m_trafficLightItems.contains(tlId)) {
+                m_trafficLightItems[tlId]->setPen(QPen(Qt::black, 2));
+            }
+        }
+
+    }
 }
+
+

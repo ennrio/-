@@ -4,6 +4,7 @@
 #include <QGridLayout>
 #include <QFont>
 #include "simulationmanager.h"
+#include "constants.h"
 
 TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
     : QWidget(parent)
@@ -193,17 +194,17 @@ void TrafficLightControlWidget::onModeChanged(const QString &modeText)
     if (isAuto) {
         newText = "Автоматический режим";
         colorCode = "#00AA00";
-        if(sv) sv->setLightAutoMode();
+        sv->setLightMode(LightMode::autoMode);
     }
     else if (isManual) {
         newText = "Ручное управление";
         colorCode = "#FFAA00";
-        if(sv) sv->setLightManualOperation();
+        if(sv) sv->setLightMode(LightMode::manualMode);
     }
     else if (isNight) {
         newText = "Ночной режим";
         colorCode = "#00AAFF";
-        if(sv) sv->setLightNightMode();
+        if(sv) sv->setLightMode(LightMode::nightMode);
     }
     else {
         newText = modeText;

@@ -122,11 +122,11 @@ void TrafficLightController::restartCycle()
     }
 }
 
-void TrafficLightController::setNightMode(bool enable)
+void TrafficLightController::setMode(LightMode mode)
 {
-    if (enable) {
+    lm = mode;
+    if (lm == LightMode::nightMode) {
         // Включаем ночной режим
-        lm = LightMode::nightMode;
         m_manualOverride = true;
         m_overrideState = LightState::Yellow;
 
@@ -143,9 +143,7 @@ void TrafficLightController::setNightMode(bool enable)
         m_blinkTimer.start();
 
         qDebug() << "TL" << m_light->id() << ": Night mode ON, blink timer started.";
-    } else {
-        // Выключаем ночной режим
-        lm = LightMode::autoMode; // Или default, смотря как у вас называется обычный режим
+    } else if (mode == LightMode::manualMode){
 
         // 1. Останавливаем мигание
         m_blinkTimer.stop();

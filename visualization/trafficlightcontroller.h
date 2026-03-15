@@ -26,7 +26,7 @@ public:
     void resumeAutomatic();
 
     void restartCycle();
-    void setNightMode(bool enable);
+    void setMode(LightMode mode);
 
     LightState currentState() const;
 

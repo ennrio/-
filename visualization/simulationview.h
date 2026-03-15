@@ -57,6 +57,7 @@ public:
     QPointF convertLatLon(double lat, double lon) const;
 
     //управление свотофорами
+    void setLightMode(LightMode mode);
     void setLightAutoMode();
     void setLightManualOperation();
     void setLightNightMode();
