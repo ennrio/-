@@ -44,6 +44,10 @@ public:
 
     void startSimulation();
     void stopSimulation();
+    int getActiveVehicleCount() const;
+    int getVehicleCount() const;
+    double getAverageSpeed() const;
+
     void setSimulationSpeed(double factor) { m_timeFactor = factor; }
     void drawRoad(long long fromId, long long toId, const QString &type);
     double calculateDistance(double lat1, double lon1, double lat2, double lon2);
@@ -85,6 +89,7 @@ private:
     QMap<int, TrafficLight*> m_trafficLights; // Кэш светофоров
     QMap<int, QGraphicsEllipseItem*> m_trafficLightItems; // view
     QMap<int, TrafficLightController*> m_controllers;  // логика
+    static constexpr qint64 VEHICLE_HIDE_TIMEOUT_MS = 30 * 60 * 1000;
 
     QColor colorForState(LightState state);
 

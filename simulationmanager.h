@@ -21,6 +21,9 @@ public:
 
     void stopSimulationView();
 
+    int getContActivevehicle();
+
+
 private:
     // === Приватный конструктор ===
     explicit SimulationManager() = default;

@@ -13,6 +13,7 @@ TrafficLightItem::TrafficLightItem(long long id,
     setAcceptedMouseButtons(Qt::LeftButton);
 }
 
+
 void TrafficLightItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
 {
 

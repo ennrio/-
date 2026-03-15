@@ -15,7 +15,7 @@ public:
     explicit TrafficLightController(TrafficLight* light, QObject* parent = nullptr);
 
     // Настройка стандартного цикла: красный → зелёный → жёлтый
-    void setStandardCycle(int greenMs = 30000, int yellowMs = 5000, int redMs = 25000);
+    void setStandardCycle(int greenMs = 60000, int yellowMs = 5000, int redMs = 25000);
 
     // Для адаптивного управления: установить фазы динамически
     void setPhases(const QVector<PhaseConfig>& phases);

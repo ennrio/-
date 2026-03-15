@@ -1,6 +1,7 @@
 #include "vehicle.h"
 #include <QLineF>
 #include <QDebug>
+#include <QDateTime>
 #include <cmath>
 
 Vehicle::Vehicle(QPointF startPosition, int id, QObject* parent)
@@ -26,6 +27,16 @@ void Vehicle::setTrafficLightAwareness(bool enabled)
     m_trafficLightAware = enabled;
 }
 
+void Vehicle::markRouteFinished()
+{
+    m_routeFinished = true;
+    m_active = false;
+    m_finishedTimestamp = QDateTime::currentMSecsSinceEpoch();
+    m_speed = 0.0;  // Останавливаем
+    qDebug() << "Vehicle" << m_id << "marked as finished at"
+             << QDateTime::fromMSecsSinceEpoch(m_finishedTimestamp).toString("hh:mm:ss");
+}
+
 void Vehicle::setTrafficLightChecker(TrafficLightChecker checker)
 {
     m_trafficLightChecker = checker;
@@ -34,9 +45,13 @@ void Vehicle::setTrafficLightChecker(TrafficLightChecker checker)
 void Vehicle::update(double deltaTime)
 {
     if (m_route.isEmpty() || m_currentRouteIndex >= m_route.size()) {
-        return; // Маршрут завершён
+        return;
     }
 
+    if (m_route.isEmpty() || m_currentRouteIndex >= m_route.size()) {
+        markRouteFinished();
+        return;
+    }
     // === ПРОВЕРКА СВЕТОФОРА ===
     if (m_trafficLightAware && m_stoppedAtLightId < 0) {
         if (checkTrafficLightAhead()) {
@@ -57,6 +72,7 @@ void Vehicle::update(double deltaTime)
         m_currentRouteIndex++;
         if (m_currentRouteIndex >= m_route.size()) {
             qDebug() << "Vehicle" << m_id << "reached destination";
+            markRouteFinished();
             emit positionChanged(m_id, m_position);
             return;
         }
@@ -79,8 +95,9 @@ void Vehicle::update(double deltaTime)
     }
 
     // Перемещение
-    qreal distance = m_speed * deltaTime;
-    moveAlongPath(distance);
+    qreal pixelsPerSecond = m_speed / m_metersPerPixel;
+    qreal distancePixels = pixelsPerSecond * deltaTime;
+    moveAlongPath(distancePixels);
 
     emit positionChanged(m_id, m_position);
 }

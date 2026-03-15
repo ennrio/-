@@ -67,7 +67,7 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     // Подключённые устройства
     QLabel *devicesLabel = new QLabel("Подключённые устройства");
     devicesLabel->setStyleSheet("color: #0077CC; font-weight: bold;");
-    QLabel *devicesCount = new QLabel("42/45 ▲ 3 устройства активны");
+    devicesCount = new QLabel("42/45 ▲ 3 устройства активны");
     devicesCount->setStyleSheet("color: #0077CC; font-size: 12px;");
     metricsLayout->addWidget(devicesLabel, 0, 0);
     metricsLayout->addWidget(devicesCount, 0, 1);
@@ -75,15 +75,15 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     // Активные инциденты
     QLabel *incidentsLabel = new QLabel("Активные инциденты");
     incidentsLabel->setStyleSheet("color: #CC0000; font-weight: bold;");
-    QLabel *incidentsCount = new QLabel("2 ▼ 1 с прошлого часа");
+    QLabel *incidentsCount = new QLabel("TODO");
     incidentsCount->setStyleSheet("color: #CC0000; font-size: 12px;");
     metricsLayout->addWidget(incidentsLabel, 1, 0);
     metricsLayout->addWidget(incidentsCount, 1, 1);
 
     // Средняя скорость
-    QLabel *speedLabel = new QLabel("Средняя скорость");
+    speedLabel = new QLabel("Средняя скорость");
     speedLabel->setStyleSheet("color: #00AA00; font-weight: bold;");
-    QLabel *speedCount = new QLabel("48 км/ч ▲ 5 км/ч");
+    speedCount = new QLabel("48 км/ч ▲ 5 км/ч");
     speedCount->setStyleSheet("color: #00AA00; font-size: 12px;");
     metricsLayout->addWidget(speedLabel, 2, 0);
     metricsLayout->addWidget(speedCount, 2, 1);
@@ -178,6 +178,12 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
 
 
     connect(btnNewShift, &QPushButton::clicked, this, &MainScreenWidget::onStartNewShift);
+    m_updateTimer = new QTimer(this);
+    m_updateTimer->setInterval(1000);
+
+    // Подключаем сигнал timeout к нашему новому слоту
+    connect(m_updateTimer, &QTimer::timeout, this, &MainScreenWidget::updateMainScreen);
+    m_updateTimer->start();
     // Загружаем
     m_simulationView->setWindowTitle("Тест");
     m_simulationView->resize(600, 400);
@@ -229,4 +235,11 @@ void MainScreenWidget::onStartNewShift()
         // 2. Сбросить статистику предыдущей смены
         // 3. Запустить таймер длительности смены
     }
+}
+
+void MainScreenWidget::updateMainScreen()
+{
+    devicesCount->setText(QString::number(m_simulationView->getActiveVehicleCount())+"/"
+                          +QString::number(m_simulationView->getVehicleCount()) + " активных авто");
+    speedCount->setText(QString::number(m_simulationView->getAverageSpeed()) + "км/ч");
 }

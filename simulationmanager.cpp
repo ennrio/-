@@ -28,3 +28,8 @@ void SimulationManager::stopSimulationView()
 {
     m_simulationView->stopSimulation();
 }
+
+int SimulationManager::getContActivevehicle()
+{
+    return 20;
+}

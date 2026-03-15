@@ -8,7 +8,7 @@ VehicleItem::VehicleItem(Vehicle* vehicle, QGraphicsItem* parent)
 {
     // цвет машины
     setRect(-5, -5, 10, 10); // Круг радиусом 5
-    setBrush(QBrush(QColor(128, 0, 128)));  // Красный цвет
+    setBrush(QBrush(QColor(300, 100, 100)));
     m_pen = QPen(Qt::black, 1);
     m_brush = QBrush(m_color);
 
@@ -21,7 +21,9 @@ VehicleItem::VehicleItem(Vehicle* vehicle, QGraphicsItem* parent)
 
 void VehicleItem::setColor(const QColor &color)
 {
-    setBrush(QBrush(color));
+    m_color = color;
+    m_brush = QBrush(color);
+    update();
 }
 
 void VehicleItem::updatePosition()

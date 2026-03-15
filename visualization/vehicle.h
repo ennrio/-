@@ -31,8 +31,12 @@ public:
 
     void update(double deltaTime);
     void setRoute(const QList<QPointF>& route);
-    void setSpeed(qreal maxSpeed);
     void setTrafficLightAwareness(bool enabled);
+
+    bool isActive() const { return m_active; }
+    bool isRouteFinished() const { return m_routeFinished; }
+    qint64 finishedTimestamp() const { return m_finishedTimestamp; }
+    void markRouteFinished();
 
     QPointF position() const { return m_position; }
     qreal speed() const { return m_speed; }
@@ -41,6 +45,13 @@ public:
     // Для связи с SimulationView
     using TrafficLightChecker = std::function<LightState(const QPointF&, qreal)>;
     void setTrafficLightChecker(TrafficLightChecker checker);
+
+    //управление скоростью
+    void setSpeed(qreal maxSpeed);
+    void setMaxSpeed(qreal speed) { m_maxSpeed = speed; } // Алиас
+    void setAcceleration(qreal acc) { m_acceleration = acc; }
+    void setDeceleration(qreal dec) { m_deceleration = dec; }
+
 
 signals:
     void positionChanged(int id, QPointF newPos);
@@ -54,6 +65,7 @@ private:
     qreal m_maxSpeed{15.0}; // м/с (~54 км/ч)
     qreal m_acceleration{2.0}; // м/с²
     qreal m_deceleration{4.0}; // м/с² для торможения
+    qreal m_metersPerPixel{0.5};
     QList<QPointF> m_route;
     int m_currentRouteIndex{0};
 
@@ -66,4 +78,8 @@ private:
     bool checkTrafficLightAhead();
     void applyBraking(double deltaTime);
     void applyAcceleration(double deltaTime);
+
+    bool m_active{true};
+    bool m_routeFinished{false};
+    qint64 m_finishedTimestamp{0};
 };

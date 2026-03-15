@@ -31,6 +31,9 @@ private:
     QVBoxLayout *m_sessionLayout;
     QLabel *m_operator, *m_startTimeLabel, *m_durationLabel;
     QLabel *m_devicesLabel, *m_incidentsLabel, *m_speedLabel, *m_loadLabel;
+    QLabel *devicesCount;
+    QLabel *speedLabel;
+    QLabel *speedCount;
     QLabel *m_operatorLabel;
     SimulationView* m_simulationView;
     QLabel *m_alertLabel;
@@ -43,6 +46,7 @@ private:
     // Карта (ваша SimulationView)
     QWidget *m_mapContainer;
 
+    QTimer *m_updateTimer;
     QTimer *m_shiftTimer;
     QDateTime m_shiftStartTime;
 
@@ -54,6 +58,7 @@ private:
     int minutes = 0;
 private slots:
     void onStartNewShift();
+    void updateMainScreen();
 };
 
 #endif // MAINSCREENWIDGET_H

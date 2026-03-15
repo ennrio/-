@@ -158,7 +158,7 @@ void SimulationView::setVehicleRoute(int vehicleId, const QList<QPointF> &routeP
 
     // Устанавливаем маршрут транспортному средству
     m_vehicles[vehicleId]->setRoute(routePoints);
-    m_vehicles[vehicleId]->setSpeed(10.0 + QRandomGenerator::global()->bounded(5)); // 10-15 м/с
+    m_vehicles[vehicleId]->setSpeed(11.0 + QRandomGenerator::global()->bounded(6));
 
     qDebug() << "Route set for vehicle" << vehicleId
              << "with" << routePoints.size() << "points";
@@ -194,6 +194,43 @@ void SimulationView::stopSimulation()
     m_vehicleSpawnTimer.stop();
     qDebug() << "Simulation stopped";
 }
+
+int SimulationView::getActiveVehicleCount() const
+{
+    int counter = 0;
+    for(auto it:m_vehicles){
+        if(it->isActive()){
+            counter++;
+        }
+    }
+    return counter; // TODO можно оптимизировать, если правильно упорядочивать массив
+}
+
+int SimulationView::getVehicleCount() const
+{
+    return m_vehicles.count();
+}
+
+double SimulationView::getAverageSpeed() const
+{
+    if (m_vehicles.isEmpty()) {
+        return 0.0;
+    }
+
+    double totalSpeed = 0.0;
+    int activeCount = 0;
+
+    for (const Vehicle* vehicle : m_vehicles) {
+        if (vehicle && vehicle->isActive()) {
+            totalSpeed += vehicle->speed();
+            ++activeCount;
+        }
+    }
+
+    return (activeCount > 0) ? (totalSpeed*3600/1000 / activeCount) : 0.0;
+}
+
+
 
 void SimulationView::drawRoad(long long fromId, long long toId, const QString &type)
 {
@@ -235,17 +272,43 @@ void SimulationView::wheelEvent(QWheelEvent *event)
 
 void SimulationView::updateSimulation()
 {
-    // Вычисляем дельту времени
     double currentTime = m_elapsedTimer.elapsed() / 1000.0;
     double deltaTime = (currentTime - m_lastUpdateTime) * m_timeFactor;
     m_lastUpdateTime = currentTime;
 
-    // Обновляем все транспортные средства
+    // Текущее время в миллисекундах для таймаута
+    qint64 currentMsecs = QDateTime::currentMSecsSinceEpoch();
+
     for (auto it = m_vehicles.begin(); it != m_vehicles.end(); ++it) {
-        it.value()->update(deltaTime);
+        Vehicle* vehicle = it.value();
+        int id = vehicle->id();
+
+        // Обновляем физику только активных машин
+        if (vehicle->isActive()) {
+            vehicle->update(deltaTime);
+        }
+
+        // Обновляем графику
+        if (m_vehicleItems.contains(id)) {
+            VehicleItem* item = m_vehicleItems[id];
+
+            if (vehicle->isRouteFinished()) {
+                item->setColor(Qt::blue);
+
+                if (currentMsecs - vehicle->finishedTimestamp() > VEHICLE_HIDE_TIMEOUT_MS) {
+                    item->hide();
+                } else {
+                    item->show();
+                    item->setPos(vehicle->position());
+                }
+            } else {
+                item->setColor(QColor(128, 0, 128));
+                item->show();
+                item->setPos(vehicle->position());
+            }
+        }
     }
-    updateVehicleGraphics();
-    // Обновляем сцену
+
     m_scene->update();
 }
 
@@ -349,7 +412,7 @@ LightState SimulationView::getTrafficLightStateAtPosition(const QPointF &positio
 
 void SimulationView::spawnVehicle()
 {
-    if (m_isLoading || m_vehicles.size() >= 50) return;
+    if (m_isLoading || m_vehicles.size() >= 5000) return;
     if (m_roadGraph->nodeCount() < 2 || m_roadGraph->edgeCount() < 1) return;
 
     // Если уже идёт расчёт — пропускаем этот спавн
@@ -358,7 +421,7 @@ void SimulationView::spawnVehicle()
     }
 
     auto future = QtConcurrent::run([this]() {
-        return calculateRouteAsync();  // ← Новая функция, см. ниже
+        return calculateRouteAsync();
     });
 
     m_routeCalculationWatcher->setFuture(future);
@@ -367,6 +430,7 @@ void SimulationView::spawnVehicle()
 void SimulationView::onRouteCalculationFinished()
 {
     QList<QPointF> routePoints = m_routeCalculationWatcher->result();
+
 
     if (routePoints.size() < 2) {
         // qDebug() << "Route calculation failed";
@@ -382,7 +446,11 @@ void SimulationView::onRouteCalculationFinished()
             return getTrafficLightStateAtPosition(pos, radius);
         });
         v->setTrafficLightAwareness(true);
-        v->setSpeed(10.0 + QRandomGenerator::global()->bounded(5));
+        v->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
+
+        v->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
+        v->setAcceleration(3.5);
+        v->setDeceleration(5.0);
     }
 
     qDebug() << "Vehicle" << vehicleId << "spawned with route of"
@@ -458,7 +526,7 @@ QPointF SimulationView::latLonToScene(double lat, double lon) const
 {
     const double centerLat = 59.9386;
     const double centerLon = 30.3141;
-    const double metersPerPixel = 0.5; // 1 пиксель = 0.5 метра (для района 2×2 км)
+    const double metersPerPixel = 1;
 
     // Расстояние в метрах от центра
     double dx = (lon - centerLon) * 111320.0 * cos(qDegreesToRadians(centerLat));
