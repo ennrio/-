@@ -10,6 +10,7 @@
 #include <QPushButton>
 #include <QComboBox>
 
+
 class TrafficLightControlWidget : public QWidget
 {
     Q_OBJECT
@@ -17,12 +18,16 @@ class TrafficLightControlWidget : public QWidget
 public:
     explicit TrafficLightControlWidget(QWidget *parent = nullptr);
 
-private:
+private slots:
+    void onModeChanged(const QString &modeText);
+
+private:  
     QGroupBox *m_crossingListGroupBox;
     QListWidget *m_crossingList;
     QGroupBox *m_controlGroupBox;
     QComboBox *m_modeComboBox;
     QLabel *m_greenLabel, *m_yellowLabel, *m_redLabel;
+    QLabel *statusLabel;
     QLineEdit *m_greenInput, *m_yellowInput, *m_redInput;
     QGroupBox *m_priorityGroupBox;
     QListWidget *m_priorityList;

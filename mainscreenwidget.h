@@ -58,6 +58,7 @@ private:
     int hours = 0;
     int minutes = 0;
     int maxCountVehicle = 0;
+
 private slots:
     void onStartNewShift();
     void updateMainScreen();

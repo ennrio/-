@@ -230,6 +230,8 @@ void MainScreenWidget::onStartNewShift()
                                                        "Роль: " + role + "\n"
                                               "Время начала: " + startTime);
 
+
+
         // TODO
         // 1. Сохранить данные в БД
         // 2. Сбросить статистику предыдущей смены
@@ -240,15 +242,15 @@ void MainScreenWidget::onStartNewShift()
 void MainScreenWidget::updateMainScreen()
 {
     int count_vechicle = 0;
-    if(m_simulationView){
-        count_vechicle = m_simulationView->getActiveVehicleCount();
-        this->maxCountVehicle = qMax(count_vechicle,maxCountVehicle);
-    }
+
+    count_vechicle = m_simulationView->getActiveVehicleCount();
+    this->maxCountVehicle = qMax(count_vechicle,maxCountVehicle);
+
     devicesCount->setText(QString::number(count_vechicle)+"/"
                           +QString::number(m_simulationView->getVehicleCount()) + " активных авто");
-    int loading_road = 100;
+    double loading_road = 100;
     if(count_vechicle && maxCountVehicle){ // TODO можно оптимизировать
-        loading_road = count_vechicle/maxCountVehicle * 100;
+        loading_road = (double)count_vechicle/maxCountVehicle * 100;
     }
     loadCount->setText(QString::number(loading_road) + " %"); //TODO нужно брать значение от истор максимума или от среднеквадратичного отклонения, по хорошему вообще расчитывать для каждой дороги по отдельности
     speedCount->setText(QString::number(m_simulationView->getAverageSpeed()) + " км/ч");

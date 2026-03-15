@@ -14,7 +14,7 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
     mainLayout->setSpacing(12);
 
     // === Верхняя панель статуса ===
-    QLabel *statusLabel = new QLabel("Автоматический режим");
+    statusLabel = new QLabel("Автоматический режим");
     statusLabel->setAlignment(Qt::AlignCenter);
     statusLabel->setStyleSheet(
         "font-weight: bold; "
@@ -114,8 +114,16 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
     QHBoxLayout *modeLayout = new QHBoxLayout;
     modeLayout->addWidget(new QLabel("Режим работы:"));
     m_modeComboBox = new QComboBox;
-    m_modeComboBox->addItems({"Автоматический (рекомендуется)", "Ручной", "Ночной режим", "Режим ЧП"});
+    m_modeComboBox->addItems({"Автоматический (рекомендуется)", "Ручной", "Ночной режим"});
     modeLayout->addWidget(m_modeComboBox);
+
+    connect(m_modeComboBox, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
+            this, &TrafficLightControlWidget::onModeChanged);
+
+    // Инициализируем стиль сразу, чтобы при запуске было правильно
+    onModeChanged(m_modeComboBox->currentText());
+    // ===========================
+
     paramsLayout->addLayout(modeLayout);
 
     // Длительность фаз
@@ -198,3 +206,42 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
     mainLayout->addWidget(paramsGroupBox);
 
 }
+
+void TrafficLightControlWidget::onModeChanged(const QString &modeText)
+{
+    QString newText;
+    QString colorCode;
+    QString bgColor = "#202020"; // Фон оставляем темным
+
+    // Логика выбора цвета и текста
+    if (modeText.contains("Автоматический")) {
+        newText = "Автоматический режим";
+        colorCode = "#00AA00"; // Зеленый
+    }
+    else if (modeText.contains("Ручной")) {
+        newText = "Ручное управление";
+        colorCode = "#FFAA00"; // Оранжевый (внимание)
+    }
+    else if (modeText.contains("Ночной")) {
+        newText = "Ночной режим";
+        colorCode = "#00AAFF"; // Синий (спокойный)
+    }
+    else {
+        newText = modeText;
+        colorCode = "#FFFFFF";
+    }
+
+    // Обновляем текст
+    statusLabel->setText(newText);
+
+    statusLabel->setStyleSheet(
+        "font-weight: bold; "
+        "color: " + colorCode + "; "
+                      "background-color: " + bgColor + "; "
+                    "border-radius: 4px; "
+                    "padding: 8px; "
+                    "font-size: 14px;"
+        );
+}
+
+
