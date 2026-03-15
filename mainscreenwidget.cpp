@@ -193,7 +193,7 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
 
 void MainScreenWidget::onStartNewShift()
 {
-    RegisterDialog dialog(this);
+    RegisterDialog dialog(this,is_first);
 
     if (dialog.exec() == QDialog::Accepted) {
         // Регистрация успешна — обновляем интерфейс

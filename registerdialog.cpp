@@ -2,12 +2,17 @@
 #include <QLabel>
 #include <QMessageBox>
 
-RegisterDialog::RegisterDialog(QWidget *parent)
+RegisterDialog::RegisterDialog(QWidget *parent, bool *is_first)
     : QDialog(parent)
 {
     setWindowTitle("Регистрация нового оператора");
     setMinimumWidth(400);
-    setModal(true); // Модальное окно — блокирует родительское
+    setModal(true);
+
+    if (is_first && *is_first) {
+        // Убираем Qt::WindowCloseButtonHint — скрытие кнопки [X]
+        setWindowFlags(windowFlags() & ~Qt::WindowCloseButtonHint & ~Qt::WindowSystemMenuHint);
+    }
 
     // === Поля формы ===
     m_nameEdit = new QLineEdit(this);
@@ -44,15 +49,26 @@ RegisterDialog::RegisterDialog(QWidget *parent)
     mainLayout->addLayout(btnLayout);
 
     // === Сигналы и слоты ===
-    connect(m_okBtn, &QPushButton::clicked, this, [this]() {
+    connect(m_okBtn, &QPushButton::clicked, this, [this, is_first]() {  // ⚠️ захватываем is_first
         if (m_nameEdit->text().trimmed().isEmpty()) {
             QMessageBox::warning(this, "Ошибка", "Пожалуйста, введите ФИО оператора");
             return;
         }
-        accept(); // Закрываем диалог с кодом QDialog::Accepted
+
+        if (is_first) {
+            *is_first = false;
+        }
+
+        accept();
     });
 
-    connect(m_cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+    connect(m_cancelBtn, &QPushButton::clicked, this, [this, is_first]() {
+        if(*is_first == true){
+           std::exit(1);
+        }else{
+            reject();
+        }
+    });
 }
 
 QString RegisterDialog::operatorName() const {

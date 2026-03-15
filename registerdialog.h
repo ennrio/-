@@ -13,7 +13,7 @@ class RegisterDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit RegisterDialog(QWidget *parent = nullptr);
+    explicit RegisterDialog(QWidget *parent = nullptr, bool *is_first = nullptr);
 
     // Геттеры для получения данных после закрытия диалога
     QString operatorName() const;
