@@ -9,8 +9,7 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QMap>
-#include <QCheckBox>
-#include "visualization/simulationview.h"
+#include "visualization/simulationview.h"  // Отсюда берём CrossingInfo
 
 class TrafficLightControlWidget : public QWidget
 {
@@ -23,11 +22,7 @@ public:
 private slots:
     void onModeChanged(const QString &modeText);
     void onCrossingSelected();
-    void onApplyClicked();
-    void onResetClicked();
-    void onApplyToStreetClicked();
     void updateCrossingStatus(long long tlId, bool requiresAttention);
-    void onSortByStatusChanged(int state);
 
 private:
     QGroupBox *m_controlGroupBox;
@@ -36,11 +31,9 @@ private:
     QComboBox *m_modeComboBox;
     QLabel *statusLabel;
     QLineEdit *m_greenInput, *m_yellowInput, *m_redInput;
-    QListWidget *m_crossingList;
+    QListWidget *m_crossingList;      // ОДИН список для перекрёстков
     QListWidget *m_priorityList;
     QPushButton *m_applyButton, *m_resetButton, *m_diagnosticsButton;
-    QPushButton *m_applyToStreetButton;
-    QCheckBox *m_sortByStatusCheckBox;
 
     SimulationView* sv;
     QMap<long long, CrossingInfo> m_crossingsMap;
@@ -48,7 +41,6 @@ private:
 
     void updateCrossingListItem(long long id);
     void loadCrossingParams(long long id);
-    void sortCrossingList();
 };
 
 #endif // TRAFFICLIGHTCONTROLWIDGET_H
