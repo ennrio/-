@@ -24,6 +24,11 @@ struct PendingWay {
     bool isOneWay{false};
 };
 
+struct CrossingInfo {
+    long long id;             // ID светофора в системе
+    QString name;             // Название (например, "Невский / Литейный")
+    bool requiresAttention;   // Флаг "Требует внимания"
+};
 
 
 class SimulationView : public QGraphicsView
@@ -62,11 +67,15 @@ public:
     void setLightManualOperation();
     void setLightNightMode();
 
+    QMap<long long, CrossingInfo> getTrafficLightsList() const;
+    void setTrafficLightAttention(long long id, bool attention);
+
 //MEMBERS
 public:
 
 protected:
     void wheelEvent(QWheelEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
 
 private slots:
     void updateSimulation();
@@ -76,6 +85,7 @@ private slots:
     void onOSMLoadingFinished();
     void spawnVehicle();
     void onRouteCalculationFinished();
+    void checkTrafficCongestion();
 
 //METHODS
 private:
@@ -150,8 +160,13 @@ private:
     QTimer m_vehicleSpawnTimer;
     int m_vehicleCounter{0};
     int m_edgeIdCounter{1};
+
+    // Кэш текущего состояния "внимания", чтобы не слать сигналы лишний раз
+    QTimer m_congestionCheckTimer;
+    QMap<long long, bool> m_currentAttentionState;
 signals:
     void osmLoadingFinished();
+    void trafficLightStatusChanged(long long tlId, bool requiresAttention);
 };
 
 #endif // SIMULATIONVIEW_H

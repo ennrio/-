@@ -39,7 +39,6 @@ int SimulationManager::getContActivevehicle()
     return 0;
 }
 
-// === РЕАЛИЗАЦИЯ НОВЫХ МЕТОДОВ ===
 
 QMap<long long, CrossingInfo> SimulationManager::getTrafficLightCrossings() const
 {

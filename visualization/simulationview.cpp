@@ -13,6 +13,8 @@
 #include <QRandomGenerator>
 #include <QtConcurrent>
 #include <QFutureWatcher>
+#include <QContextMenuEvent>
+#include <qmenu.h>
 #include "trafficlightitem.h"
 
 
@@ -66,6 +68,9 @@ SimulationView::SimulationView(QWidget *parent)
     connect(this, &SimulationView::osmLoadingFinished,
             this, &SimulationView::onOSMLoadingFinished,
             Qt::UniqueConnection);
+
+    m_congestionCheckTimer.setInterval(1000);
+    connect(&m_congestionCheckTimer, &QTimer::timeout, this, &SimulationView::checkTrafficCongestion);
 }
 
 SimulationView::~SimulationView()
@@ -270,6 +275,68 @@ void SimulationView::wheelEvent(QWheelEvent *event)
     event->accept();
 }
 
+void SimulationView::contextMenuEvent(QContextMenuEvent *event)
+{
+    QPoint pos = event->pos();
+    QGraphicsItem *item = itemAt(pos);
+
+    long long clickedTlId = -1;
+
+    // Ищем, кликнули ли мы по светофору (или его дочернему элементу)
+    while (item) {
+        // Проверяем наш маппинг элементов светофоров
+        auto it = m_trafficLightItems.begin();
+        while (it != m_trafficLightItems.end()) {
+            if (it.value() == item || item->parentItem() == it.value()) {
+                clickedTlId = it.key();
+                break;
+            }
+            ++it;
+        }
+        if (clickedTlId != -1) break;
+        item = item->parentItem();
+    }
+
+    if (clickedTlId != -1) {
+        QMenu menu(this);
+        menu.setStyleSheet("QMenu { background-color: #333; color: white; border: 1px solid #555; }");
+
+        QAction* actionAlert = menu.addAction(" Добавить в список 'Требует внимания'");
+        QAction* actionReset = menu.addAction(" Сбросить статус (Норма)");
+        menu.addSeparator();
+        QAction* actionToggle = menu.addAction(" Переключить вручную");
+
+        QAction* selectedAction = menu.exec(event->globalPos());
+
+        if (selectedAction) {
+            if (selectedAction == actionAlert) {
+                // Принудительно ставим статус "Внимание"
+                m_currentAttentionState[clickedTlId] = true;
+                emit trafficLightStatusChanged(clickedTlId, true);
+
+                // Визуально помечаем
+                if (m_trafficLightItems.contains(clickedTlId))
+                    m_trafficLightItems[clickedTlId]->setPen(QPen(Qt::red, 4));
+
+            } else if (selectedAction == actionReset) {
+                // Сбрасываем статус
+                m_currentAttentionState[clickedTlId] = false;
+                emit trafficLightStatusChanged(clickedTlId, false);
+
+                if (m_trafficLightItems.contains(clickedTlId))
+                    m_trafficLightItems[clickedTlId]->setPen(QPen(Qt::black, 2));
+
+            } else if (selectedAction == actionToggle) {
+                // Ручное переключение фаз (ваша существующая логика)
+                cycleTrafficLightState(clickedTlId);
+            }
+        }
+    } else {
+        // Если клик не по светофору, стандартное поведение
+        QGraphicsView::contextMenuEvent(event);
+    }
+}
+
 void SimulationView::updateSimulation()
 {
     double currentTime = m_elapsedTimer.elapsed() / 1000.0;
@@ -455,6 +522,49 @@ void SimulationView::onRouteCalculationFinished()
 
     qDebug() << "Vehicle" << vehicleId << "spawned with route of"
              << routePoints.size() << "points";
+}
+
+void SimulationView::checkTrafficCongestion()
+{
+    const qreal checkRadius = 60.0; // Радиус в пикселях (примерно 30-50 метров)
+
+    for (auto it = m_trafficLights.begin(); it != m_trafficLights.end(); ++it) {
+        long long tlId = it.key();
+        TrafficLight* tl = it.value();
+        QPointF tlPos = tl->position();
+
+        int vehicleCount = 0;
+
+        // Считаем активные машины в радиусе перед светофором
+        for (auto vIt = m_vehicles.begin(); vIt != m_vehicles.end(); ++vIt) {
+            Vehicle* v = vIt.value();
+            if (v && v->isActive()) {
+                QPointF vPos = v->position();
+                if (QLineF(tlPos, vPos).length() < checkRadius) {
+                    vehicleCount++;
+                }
+            }
+        }
+
+        bool needsAttention = (vehicleCount > 3);
+
+        // Отправляем сигнал только если состояние изменилось
+        if (m_currentAttentionState[tlId] != needsAttention) {
+            m_currentAttentionState[tlId] = needsAttention;
+
+            // Визуальная подсветка на карте (опционально)
+            if (m_trafficLightItems.contains(tlId)) {
+                QGraphicsEllipseItem* item = m_trafficLightItems[tlId];
+                if (needsAttention) {
+                    item->setPen(QPen(Qt::red, 4));
+                } else {
+                    item->setPen(QPen(Qt::black, 2));
+                }
+            }
+
+            emit trafficLightStatusChanged(tlId, needsAttention);
+        }
+    }
 }
 
 QList<QPointF> SimulationView::calculateRouteAsync()
@@ -1200,6 +1310,41 @@ void SimulationView::setLightMode(LightMode mode)
             }
         }
 
+    }
+}
+
+QMap<long long, CrossingInfo> SimulationView::getTrafficLightsList() const
+{
+    QMap<long long, CrossingInfo> result;
+
+    // m_trafficLights использует int как ключ, но нам нужен long long (OSM ID)
+    for (auto it = m_trafficLights.begin(); it != m_trafficLights.end(); ++it) {
+        long long tlId = it.key();
+        TrafficLight* tl = it.value();
+
+        CrossingInfo info;
+        info.id = tlId;
+        info.name = QString("Перекрёсток #%1").arg(tlId);
+        info.requiresAttention = m_currentAttentionState.value(tlId, false);
+
+        result[tlId] = info;
+    }
+
+    return result;
+}
+
+void SimulationView::setTrafficLightAttention(long long id, bool attention)
+{
+    if (!m_trafficLights.contains(id)) return;
+
+    m_currentAttentionState[id] = attention;
+    emit trafficLightStatusChanged(id, attention);
+
+    // Визуальное обновление на карте
+    if (m_trafficLightItems.contains(id)) {
+        m_trafficLightItems[id]->setPen(
+            attention ? QPen(Qt::red, 4) : QPen(Qt::black, 2)
+            );
     }
 }
 

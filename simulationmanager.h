@@ -4,12 +4,6 @@
 #include "visualization/simulationview.h"
 #include <QMap>
 
-// Структура для передачи информации о светофорах в UI
-struct CrossingInfo {
-    long long id;
-    QString name;
-};
-
 class SimulationManager
 {
 public:
