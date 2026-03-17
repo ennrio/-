@@ -163,10 +163,10 @@ private:
 
     // Кэш текущего состояния "внимания", чтобы не слать сигналы лишний раз
     QTimer m_congestionCheckTimer;
-    QMap<long long, bool> m_currentAttentionState;
+    QMap<int, bool> m_currentAttentionState;
 signals:
     void osmLoadingFinished();
-    void trafficLightStatusChanged(long long tlId, bool requiresAttention);
+    void trafficLightStatusChanged(int tlId, bool requiresAttention);
 };
 
 #endif // SIMULATIONVIEW_H

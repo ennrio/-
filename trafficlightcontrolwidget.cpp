@@ -60,12 +60,11 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
         "QListWidget::item:selected { background-color: #005577; } "
         "QListWidget::item:hover { background-color: #3a3a3a; }"
         );
-    m_crossingList->setMaximumHeight(200);
+    //m_crossingList->setMaximumHeight(200);
     connect(m_crossingList, &QListWidget::itemClicked, this, &TrafficLightControlWidget::onCrossingSelected);
 
     controlLayout->addWidget(m_crossingList);
     m_controlGroupBox->setLayout(controlLayout);
-    mainLayout->addWidget(m_controlGroupBox);
 
     // === 4. Параметры светофора ===
     m_paramsGroupBox = new QGroupBox("Параметры светофора");
@@ -104,29 +103,30 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
     paramsLayout->addWidget(m_priorityGroupBox);
 
     // Кнопки
-    QHBoxLayout *btnLayout = new QHBoxLayout;
+    buttonsContainer = new QWidget;
+    buttonsContainer->setContentsMargins(0, 0, 0, 0);
+
+    btnLayout = new QHBoxLayout(buttonsContainer);
+    btnLayout->setContentsMargins(0, 0, 0, 0);
     m_applyButton = new QPushButton("Применить изменения");
     m_applyButton->setEnabled(false);
     m_resetButton = new QPushButton("Сбросить");
     m_resetButton->setEnabled(false);
-    m_diagnosticsButton = new QPushButton("Диагностика");
 
     QString btnStyle = "QPushButton { background-color: #0077CC; color: white; border-radius: 4px; padding: 8px 16px; font-weight: bold; } "
                        "QPushButton:hover { background-color: #0066BB; } "
                        "QPushButton:disabled { background-color: #555555; color: #888888; }";
     m_applyButton->setStyleSheet(btnStyle);
     m_resetButton->setStyleSheet(btnStyle);
-    m_diagnosticsButton->setStyleSheet(btnStyle);
 
     btnLayout->addWidget(m_applyButton);
     btnLayout->addWidget(m_resetButton);
-    btnLayout->addWidget(m_diagnosticsButton);
-    paramsLayout->addLayout(btnLayout);
 
-    m_paramsGroupBox->setLayout(paramsLayout);
+    mainLayout->addWidget(m_controlGroupBox);
     mainLayout->addWidget(m_paramsGroupBox);
-
     mainLayout->addStretch();
+    mainLayout->addWidget(buttonsContainer);
+
 
     // === ПОДКЛЮЧЕНИЕ К SIMULATIONVIEW ===
     // Находим SimulationView через родительский виджет
@@ -173,6 +173,7 @@ void TrafficLightControlWidget::syncWithSimulation()
         m_crossingList->addItem(item);
         updateCrossingListItem(id);
     }
+    sortCrossingList();
 }
 
 void TrafficLightControlWidget::onModeChanged(const QString &modeText)
@@ -189,10 +190,11 @@ void TrafficLightControlWidget::onModeChanged(const QString &modeText)
     if (isNight || isAuto) {
         m_controlGroupBox->hide();
         m_paramsGroupBox->hide();
+        buttonsContainer->hide();
     } else {
         m_controlGroupBox->show();
-        if (m_selectedCrossingId >= 0) m_paramsGroupBox->show();
-        else m_paramsGroupBox->hide();
+        m_paramsGroupBox->show();
+        buttonsContainer->show();
     }
 
     // Логика текста и цвета
@@ -236,13 +238,6 @@ void TrafficLightControlWidget::onCrossingSelected()
     if (m_crossingsMap.contains(id)) {
         m_paramsGroupBox->setTitle("Параметры светофора: " + m_crossingsMap[id].name);
         loadCrossingParams(id);
-
-        m_greenInput->setEnabled(true);
-        m_yellowInput->setEnabled(true);
-        m_redInput->setEnabled(true);
-        m_priorityList->setEnabled(true);
-        m_applyButton->setEnabled(true);
-        m_resetButton->setEnabled(true);
     }
 }
 
@@ -263,6 +258,7 @@ void TrafficLightControlWidget::updateCrossingStatus(long long tlId, bool requir
     }
 
     updateCrossingListItem(tlId);
+    sortCrossingList();
 }
 
 void TrafficLightControlWidget::updateCrossingListItem(long long id)
@@ -302,4 +298,27 @@ void TrafficLightControlWidget::loadCrossingParams(long long id)
     m_priorityList->clear();
     m_priorityList->addItem("Основное направление (Север-Юг)");
     m_priorityList->addItem("Второстепенное (Запад-Восток)");
+}
+
+void TrafficLightControlWidget::sortCrossingList()
+{
+    QList<QPair<QListWidgetItem*, bool>> itemsWithStatus;
+
+    while (m_crossingList->count() > 0) {
+        QListWidgetItem *item = m_crossingList->takeItem(0);  // Извлекаем, не удаляя
+        long long id = item->data(Qt::UserRole).toLongLong();
+        bool requiresAttention = m_crossingsMap.value(id).requiresAttention;
+        itemsWithStatus.append(qMakePair(item, requiresAttention));
+    }
+
+    // Сортируем: true (требует внимания) перед false
+    std::sort(itemsWithStatus.begin(), itemsWithStatus.end(),
+              [](const QPair<QListWidgetItem*, bool>& a, const QPair<QListWidgetItem*, bool>& b) {
+                  return a.second > b.second;
+              });
+
+    // Возвращаем элементы в отсортированном порядке
+    for (const auto& pair : itemsWithStatus) {
+        m_crossingList->addItem(pair.first);
+    }
 }

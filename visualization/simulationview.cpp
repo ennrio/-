@@ -70,7 +70,8 @@ SimulationView::SimulationView(QWidget *parent)
             Qt::UniqueConnection);
 
     m_congestionCheckTimer.setInterval(1000);
-    connect(&m_congestionCheckTimer, &QTimer::timeout, this, &SimulationView::checkTrafficCongestion);
+    connect(&m_congestionCheckTimer, &QTimer::timeout,
+            this, &SimulationView::checkTrafficCongestion);
 }
 
 SimulationView::~SimulationView()
@@ -190,6 +191,7 @@ void SimulationView::startSimulation()
     m_lastUpdateTime = m_elapsedTimer.elapsed() / 1000.0;
     m_simulationTimer.start();
     m_vehicleSpawnTimer.start();
+    m_congestionCheckTimer.start();
     qDebug() << "Simulation started with vehicle spawning";
 }
 
@@ -526,13 +528,11 @@ void SimulationView::onRouteCalculationFinished()
 
 void SimulationView::checkTrafficCongestion()
 {
-    const qreal checkRadius = 60.0; // Радиус в пикселях (примерно 30-50 метров)
-
+    const qreal checkRadius = 60.0;
     for (auto it = m_trafficLights.begin(); it != m_trafficLights.end(); ++it) {
         long long tlId = it.key();
         TrafficLight* tl = it.value();
         QPointF tlPos = tl->position();
-
         int vehicleCount = 0;
 
         // Считаем активные машины в радиусе перед светофором
@@ -545,14 +545,12 @@ void SimulationView::checkTrafficCongestion()
                 }
             }
         }
+        bool needsAttention = (vehicleCount >= 3); //TODO колличество
 
-        bool needsAttention = (vehicleCount > 3);
-
-        // Отправляем сигнал только если состояние изменилось
         if (m_currentAttentionState[tlId] != needsAttention) {
             m_currentAttentionState[tlId] = needsAttention;
 
-            // Визуальная подсветка на карте (опционально)
+            // Визуальная подсветка на карте
             if (m_trafficLightItems.contains(tlId)) {
                 QGraphicsEllipseItem* item = m_trafficLightItems[tlId];
                 if (needsAttention) {
