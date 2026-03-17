@@ -1,7 +1,7 @@
 // trafficlightcontroller.cpp
 #include "trafficlightcontroller.h"
 #include <QDebug>
-
+//TODO вынести тайминги в конфигурационный файл !!!
 // ============================================================================
 // Конструктор / Деструктор
 // ============================================================================
@@ -162,6 +162,36 @@ LightState TrafficLightController::currentState() const
 {
     if (!m_light) return LightState::Off;
     return m_light->state();
+}
+
+int TrafficLightController::getGreenDuration() const
+{
+    for (const auto& phase : m_phases) {
+        if (phase.state == LightState::Green) {
+            return phase.durationMs;
+        }
+    }
+    return 30000;
+}
+
+int TrafficLightController::getYellowDuration() const
+{
+    for (const auto& phase : m_phases) {
+        if (phase.state == LightState::Yellow) {
+            return phase.durationMs;
+        }
+    }
+    return 5000;
+}
+
+int TrafficLightController::getRedDuration() const
+{
+    for (const auto& phase : m_phases) {
+        if (phase.state == LightState::Red) {
+            return phase.durationMs;
+        }
+    }
+    return 25000;
 }
 
 // ============================================================================

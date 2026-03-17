@@ -113,6 +113,9 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
     m_resetButton = new QPushButton("Сбросить");
     m_resetButton->setEnabled(false);
 
+    connect(m_applyButton, &QPushButton::clicked, this, &TrafficLightControlWidget::onApplyClicked);
+    connect(m_resetButton, &QPushButton::clicked, this, &TrafficLightControlWidget::onResetClicked);
+
     QString btnStyle = "QPushButton { background-color: #0077CC; color: white; border-radius: 4px; padding: 8px 16px; font-weight: bold; } "
                        "QPushButton:hover { background-color: #0066BB; } "
                        "QPushButton:disabled { background-color: #555555; color: #888888; }";
@@ -238,6 +241,12 @@ void TrafficLightControlWidget::onCrossingSelected()
     if (m_crossingsMap.contains(id)) {
         m_paramsGroupBox->setTitle("Параметры светофора: " + m_crossingsMap[id].name);
         loadCrossingParams(id);
+        m_greenInput->setEnabled(true);
+        m_yellowInput->setEnabled(true);
+        m_redInput->setEnabled(true);
+        m_priorityList->setEnabled(true);
+        m_applyButton->setEnabled(true);
+        m_resetButton->setEnabled(true);
     }
 }
 
@@ -259,6 +268,69 @@ void TrafficLightControlWidget::updateCrossingStatus(long long tlId, bool requir
 
     updateCrossingListItem(tlId);
     sortCrossingList();
+}
+
+void TrafficLightControlWidget::onApplyClicked()
+{
+    if (!m_selectedCrossingId || !sv) {
+        QMessageBox::warning(this, "Ошибка", "Светофор не выбран");
+        return;
+    }
+
+    int green = m_greenInput->text().toInt();
+    int yellow = m_yellowInput->text().toInt();
+    int red = m_redInput->text().toInt();
+
+    // Валидация
+    if (green < 5 || green > 120) {
+        QMessageBox::warning(this, "Ошибка", "Зелёный сигнал должен быть от 5 до 120 секунд");
+        return;
+    }
+    if (yellow < 2 || yellow > 10) {
+        QMessageBox::warning(this, "Ошибка", "Жёлтый сигнал должен быть от 2 до 10 секунд");
+        return;
+    }
+    if (red < 5 || red > 120) {
+        QMessageBox::warning(this, "Ошибка", "Красный сигнал должен быть от 5 до 120 секунд");
+        return;
+    }
+
+    // Отправляем в SimulationView (в миллисекундах)
+    sv->setTrafficLightCycle(m_selectedCrossingId, green * 1000, yellow * 1000, red * 1000);
+
+    QMessageBox::information(this, "Применено",
+                             QString("Параметры для %1 обновлены:\n"
+                                     "🟢 Зелёный: %2 сек\n"
+                                     "🟡 Жёлтый: %3 сек\n"
+                                     "🔴 Красный: %4 сек")
+                                 .arg(m_crossingsMap[m_selectedCrossingId].name)
+                                 .arg(green).arg(yellow).arg(red));
+
+    qDebug() << "[APPLY] TL" << m_selectedCrossingId
+             << "G:" << green << "s Y:" << yellow << "s R:" << red;
+}
+
+void TrafficLightControlWidget::onResetClicked()
+{
+    if (m_selectedCrossingId < 0 || !sv) {
+        QMessageBox::warning(this, "Ошибка", "Светофор не выбран");
+        return;
+    }
+
+    // Сбрасываем к стандартным значениям (30/3/30)
+    sv->resetTrafficLightCycle(m_selectedCrossingId);
+
+    m_greenInput->setText("30");
+    m_yellowInput->setText("3");
+    m_redInput->setText("30");
+
+    QMessageBox::information(this, "Сброшено",
+                             "Параметры светофора возвращены к значениям по умолчанию:\n"
+                             "🟢 Зелёный: 30 сек\n"
+                             "🟡 Жёлтый: 3 сек\n"
+                             "🔴 Красный: 30 сек");
+
+    qDebug() << "[RESET] TL" << m_selectedCrossingId << "reset to default";
 }
 
 void TrafficLightControlWidget::updateCrossingListItem(long long id)
@@ -291,9 +363,16 @@ void TrafficLightControlWidget::updateCrossingListItem(long long id)
 
 void TrafficLightControlWidget::loadCrossingParams(long long id)
 {
-    m_greenInput->setText("30");
-    m_yellowInput->setText("3");
-    m_redInput->setText("30");
+    if (sv) {
+        auto params = sv->getTrafficLightCycle(id);
+        m_greenInput->setText(QString::number(params.green / 1000));
+        m_yellowInput->setText(QString::number(params.yellow / 1000));
+        m_redInput->setText(QString::number(params.red / 1000));
+    } else {
+        m_greenInput->setText("30");
+        m_yellowInput->setText("3");
+        m_redInput->setText("30");
+    }
 
     m_priorityList->clear();
     m_priorityList->addItem("Основное направление (Север-Юг)");

@@ -565,6 +565,7 @@ void SimulationView::checkTrafficCongestion()
     }
 }
 
+
 QList<QPointF> SimulationView::calculateRouteAsync()
 {
 
@@ -1344,6 +1345,40 @@ void SimulationView::setTrafficLightAttention(long long id, bool attention)
             attention ? QPen(Qt::red, 4) : QPen(Qt::black, 2)
             );
     }
+}
+
+void SimulationView::setTrafficLightCycle(long long id, int greenMs, int yellowMs, int redMs)
+{
+    if (!m_controllers.contains(id)) {
+        qWarning() << "[TL] Controller" << id << "not found!";
+        return;
+    }
+
+    auto* controller = m_controllers[id];
+    controller->setStandardCycle(greenMs, yellowMs, redMs);
+
+    qDebug() << "[TL] Cycle updated for TL" << id
+             << "G:" << greenMs/1000 << "s Y:" << yellowMs/1000 << "s R:" << redMs/1000 << "s";
+}
+
+void SimulationView::resetTrafficLightCycle(long long id)
+{
+     setTrafficLightCycle(id, 30000, 5000, 25000);
+}
+
+SimulationView::TrafficLightCycle SimulationView::getTrafficLightCycle(long long id) const
+{
+    TrafficLightCycle cycle = {30000, 5000, 25000};
+
+    if (m_controllers.contains(id)) {
+        auto* controller = m_controllers[id];
+        // Предполагается, что у TrafficLightController есть эти методы
+        cycle.green = controller->getGreenDuration();
+        cycle.yellow = controller->getYellowDuration();
+        cycle.red = controller->getRedDuration();
+    }
+
+    return cycle;
 }
 
 

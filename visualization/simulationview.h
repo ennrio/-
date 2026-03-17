@@ -37,6 +37,12 @@ class SimulationView : public QGraphicsView
 
 //METHODS
 public:
+    struct TrafficLightCycle {
+        int green;   // мс
+        int yellow;  // мс
+        int red;     // мс
+    };
+
     SimulationView(QWidget *parent = nullptr);
     ~SimulationView();
     void show();
@@ -69,6 +75,11 @@ public:
 
     QMap<long long, CrossingInfo> getTrafficLightsList() const;
     void setTrafficLightAttention(long long id, bool attention);
+
+    //управление параметрами
+    TrafficLightCycle getTrafficLightCycle(long long id) const;
+    void setTrafficLightCycle(long long id, int greenMs, int yellowMs, int redMs);
+    void resetTrafficLightCycle(long long id);
 
 //MEMBERS
 public:

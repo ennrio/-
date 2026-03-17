@@ -24,6 +24,8 @@ private slots:
     void onModeChanged(const QString &modeText);
     void onCrossingSelected();
     void updateCrossingStatus(long long tlId, bool requiresAttention);
+    void onApplyClicked();
+    void onResetClicked();
 
 private:
     QGroupBox *m_controlGroupBox;

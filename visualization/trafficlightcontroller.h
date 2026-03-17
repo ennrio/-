@@ -30,6 +30,10 @@ public:
 
     LightState currentState() const;
 
+    int getGreenDuration() const;
+    int getYellowDuration() const;
+    int getRedDuration() const;
+
 signals:
     void phaseChanged(int lightId, LightState newState);
     void cycleCompleted(int lightId);
