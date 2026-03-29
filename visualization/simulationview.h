@@ -21,6 +21,7 @@
 struct PendingWay {
     QList<long long> nodeRefs;
     QString highwayType;
+    QString name;  // Название дороги
     bool isOneWay{false};
 };
 
@@ -80,6 +81,9 @@ public:
     TrafficLightCycle getTrafficLightCycle(long long id) const;
     void setTrafficLightCycle(long long id, int greenMs, int yellowMs, int redMs);
     void resetTrafficLightCycle(long long id);
+    
+    //получение списка направлений (дорог)
+    QList<PendingWay> getAllWays() const;
 
 //MEMBERS
 public:

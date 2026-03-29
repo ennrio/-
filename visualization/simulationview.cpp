@@ -1366,6 +1366,11 @@ void SimulationView::resetTrafficLightCycle(long long id)
      setTrafficLightCycle(id, 30000, 5000, 25000);
 }
 
+QList<PendingWay> SimulationView::getAllWays() const
+{
+    return m_tempWays;
+}
+
 SimulationView::TrafficLightCycle SimulationView::getTrafficLightCycle(long long id) const
 {
     TrafficLightCycle cycle = {30000, 5000, 25000};
