@@ -26,6 +26,7 @@ private slots:
     void updateCrossingStatus(long long tlId, bool requiresAttention);
     void onApplyClicked();
     void onResetClicked();
+    void onWaySelected();
 
 private:
     QGroupBox *m_controlGroupBox;
@@ -47,6 +48,14 @@ private:
     void updateCrossingListItem(long long id);
     void loadCrossingParams(long long id);
     void sortCrossingList();
+
+    // === Вспомогательные методы для унифицированного управления ===
+    bool validatePhaseTimes(int green, int yellow, int red, QString &error);
+    QList<long long> getTargetTrafficLights() const;
+    void applySettingsToTrafficLights(const QList<long long>& tlIds, int green, int yellow, int red);
+    void resetSettingsForTrafficLights(const QList<long long>& tlIds);
+    QString formatApplyMessage(const QList<long long>& tlIds, int green, int yellow, int red) const;
+    QString formatResetMessage(const QList<long long>& tlIds) const;
 };
 
 #endif // TRAFFICLIGHTCONTROLWIDGET_H
