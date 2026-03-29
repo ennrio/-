@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QMessageBox>
 #include <QCheckBox>
+#include <QSet>
 #include "constants.h"
 #include <QDebug>
 
@@ -298,17 +299,24 @@ void TrafficLightControlWidget::onApplyClicked()
         return;
     }
 
-    // Проверяем, есть ли выбранные направления в списке
     QList<long long> selectedWayIds;
+    bool allRoadsSelected = false;
+    
     for (int i = 0; i < m_priorityList->count(); ++i) {
         QListWidgetItem *wayItem = m_priorityList->item(i);
         if (wayItem->checkState() == Qt::Checked) {
-            selectedWayIds.append(wayItem->data(Qt::UserRole).toLongLong());
+            long long wayId = wayItem->data(Qt::UserRole).toLongLong();
+            if (wayId == -1) {
+                // Выбран элемент "Все дороги участка"
+                allRoadsSelected = true;
+            } else {
+                selectedWayIds.append(wayId);
+            }
         }
     }
 
-    // Если ни одно направление не выбрано, применяем ко всем светофорам на участке
-    bool applyToAll = selectedWayIds.isEmpty();
+    // Если выбрано "Все дороги участка" или ни одно направление не выбрано
+    bool applyToAll = allRoadsSelected || selectedWayIds.isEmpty();
 
     if (applyToAll) {
         // Применяем ко всем светофорам на участке
@@ -361,17 +369,24 @@ void TrafficLightControlWidget::onResetClicked()
         return;
     }
 
-    // Проверяем, есть ли выбранные направления в списке
     QList<long long> selectedWayIds;
+    bool allRoadsSelected = false;
+    
     for (int i = 0; i < m_priorityList->count(); ++i) {
         QListWidgetItem *wayItem = m_priorityList->item(i);
         if (wayItem->checkState() == Qt::Checked) {
-            selectedWayIds.append(wayItem->data(Qt::UserRole).toLongLong());
+            long long wayId = wayItem->data(Qt::UserRole).toLongLong();
+            if (wayId == -1) {
+                // Выбран элемент "Все дороги участка"
+                allRoadsSelected = true;
+            } else {
+                selectedWayIds.append(wayId);
+            }
         }
     }
 
-    // Если ни одно направление не выбрано, сбрасываем все светофоры на участке
-    bool resetAll = selectedWayIds.isEmpty();
+    // Если выбрано "Все дороги участка" или ни одно направление не выбрано
+    bool resetAll = allRoadsSelected || selectedWayIds.isEmpty();
 
     if (resetAll) {
         // Сбрасываем все светофоры на участке
@@ -467,8 +482,18 @@ void TrafficLightControlWidget::loadCrossingParams(long long id)
     if (sv) {
         QList<PendingWay> allWays = sv->getAllWays();
         
-        int colorIndex = 0;
-        QColor colors[] = {QColor("#4CAF50"), QColor("#2196F3"), QColor("#FF9800"), QColor("#E91E63")};
+        // Добавляем элемент "Все дороги участка" с оранжевым фоном
+        QListWidgetItem *allRoadsItem = new QListWidgetItem("🛣 Все дороги участка");
+        allRoadsItem->setFlags(allRoadsItem->flags() | Qt::ItemIsUserCheckable);
+        allRoadsItem->setCheckState(Qt::Unchecked);
+        allRoadsItem->setData(Qt::UserRole, -1);  // Специальный ID для всех дорог
+        allRoadsItem->setBackground(QColor("#FF9800"));  // Оранжевый фон
+        allRoadsItem->setForeground(QColor("white"));
+        allRoadsItem->setFont(QFont("", -1, QFont::Bold));
+        m_priorityList->addItem(allRoadsItem);
+        
+        // Используем QSet для отслеживания уникальных названий
+        QSet<QString> uniqueNames;
         
         // Добавляем каждое направление как элемент списка с чекбоксом
         for (const PendingWay &way : allWays) {
@@ -484,6 +509,12 @@ void TrafficLightControlWidget::loadCrossingParams(long long id)
                 directionName += " (односторонняя)";
             }
             
+            // Проверяем на дубликаты
+            if (uniqueNames.contains(directionName)) {
+                continue;  // Пропускаем дубликат
+            }
+            uniqueNames.insert(directionName);
+            
             QListWidgetItem *item = new QListWidgetItem(directionName);
             item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
             item->setCheckState(Qt::Unchecked);
@@ -491,10 +522,9 @@ void TrafficLightControlWidget::loadCrossingParams(long long id)
             if (!way.nodeRefs.isEmpty()) {
                 item->setData(Qt::UserRole, way.nodeRefs.first());
             }
-            item->setBackground(colors[colorIndex % 4]);
+            // Убираем цветовое выделение - используем стандартный фон
             item->setForeground(QColor("white"));
             m_priorityList->addItem(item);
-            colorIndex++;
         }
         
         // Если дорог нет, добавляем направления по умолчанию
@@ -503,14 +533,18 @@ void TrafficLightControlWidget::loadCrossingParams(long long id)
             directions << "Север-Юг" << "Запад-Восток";
             
             for (const QString &dir : directions) {
+                // Проверяем на дубликаты
+                if (uniqueNames.contains(dir)) {
+                    continue;
+                }
+                uniqueNames.insert(dir);
+                
                 QListWidgetItem *item = new QListWidgetItem(dir);
                 item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
                 item->setCheckState(Qt::Unchecked);
                 item->setData(Qt::UserRole, id);
-                item->setBackground(colors[colorIndex % 4]);
                 item->setForeground(QColor("white"));
                 m_priorityList->addItem(item);
-                colorIndex++;
             }
         }
     }
