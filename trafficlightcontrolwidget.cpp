@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QCheckBox>
 #include <QSet>
+#include <QMouseEvent>
 #include "constants.h"
 #include <QDebug>
 
@@ -64,6 +65,9 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
         );
     //m_crossingList->setMaximumHeight(200);
     connect(m_crossingList, &QListWidget::itemClicked, this, &TrafficLightControlWidget::onCrossingSelected);
+    
+    // Устанавливаем фильтр событий для списка перекрёстков, чтобы отлавливать клики вне элементов
+    m_crossingList->viewport()->installEventFilter(this);
 
     controlLayout->addWidget(m_crossingList);
     m_controlGroupBox->setLayout(controlLayout);
@@ -259,6 +263,35 @@ void TrafficLightControlWidget::onCrossingSelected()
         m_applyButton->setEnabled(true);
         m_resetButton->setEnabled(true);
     }
+    
+    // Сбрасываем выделение в списке направлений при выборе нового светофора
+    for (int i = 0; i < m_priorityList->count(); ++i) {
+        QListWidgetItem *wayItem = m_priorityList->item(i);
+        wayItem->setCheckState(Qt::Unchecked);
+    }
+}
+
+void TrafficLightControlWidget::resetSelection()
+{
+    // Сбрасываем выделение в списке перекрёстков
+    m_crossingList->clearSelection();
+    m_crossingList->setCurrentItem(nullptr);
+    
+    // Сбрасываем выбранный ID
+    m_selectedCrossingId = -1;
+    
+    // Очищаем заголовок и параметры
+    m_paramsGroupBox->setTitle("Параметры светофора");
+    m_greenInput->setText("30");
+    m_yellowInput->setText("3");
+    m_redInput->setText("30");
+    m_greenInput->setEnabled(false);
+    m_yellowInput->setEnabled(false);
+    m_redInput->setEnabled(false);
+    m_priorityList->clear();
+    m_priorityList->setEnabled(false);
+    m_applyButton->setEnabled(false);
+    m_resetButton->setEnabled(false);
 }
 
 void TrafficLightControlWidget::updateCrossingStatus(long long tlId, bool requiresAttention)
@@ -306,6 +339,125 @@ void TrafficLightControlWidget::onApplyClicked()
         return;
     }
 
+    // Если выбрано "Все дороги участка" или ни одно направление не выбрано
+    bool applyToAll = allRoadsSelected || selectedWayIds.isEmpty();
+
+    if (applyToAll) {
+        // Применяем ко всем светофорам на участке (аналогично ночному режиму)
+        QSet<long long> affectedTrafficLights;
+        
+        // Получаем все дороги и собираем все узлы дорог участка
+        QList<PendingWay> allWays = sv->getAllWays();
+        QSet<long long> allSectionNodes;
+        
+        for (const PendingWay &way : allWays) {
+            for (long long nodeId : way.nodeRefs) {
+                allSectionNodes.insert(nodeId);
+            }
+        }
+        
+        // Находим все светофоры, которые принадлежат этим узлам
+        for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
+            long long tlId = it.key();
+            long long osmNodeId = sv->getTrafficLightOsmNodeId(tlId);
+            
+            if (allSectionNodes.contains(osmNodeId)) {
+                affectedTrafficLights.insert(tlId);
+            }
+        }
+        
+        // Применяем настройки ко всем найденным светофорам
+        for (long long tlId : affectedTrafficLights) {
+            sv->setTrafficLightCycle(tlId, green * 1000, yellow * 1000, red * 1000);
+        }
+
+        QMessageBox::information(this, "Применено",
+                                 QString("Параметры обновлены для всех светофоров участка (%1 шт.):\n"
+                                         "🟢 Зелёный: %2 сек\n"
+                                         "🟡 Жёлтый: %3 сек\n"
+                                         "🔴 Красный: %4 сек")
+                                     .arg(affectedTrafficLights.size())
+                                     .arg(green).arg(yellow).arg(red));
+
+        qDebug() << "[APPLY ALL] Applied to" << affectedTrafficLights.size() << "traffic lights"
+                 << "G:" << green << "s Y:" << yellow << "s R:" << red;
+    } else {
+        // Применяем к выбранным направлениям - находим все светофоры на этих дорогах
+        // и на дорогах, которые пересекаются с ними
+        QSet<long long> affectedTrafficLights;
+        
+        for (long long selectedWayId : selectedWayIds) {
+            // Получаем все дороги
+            QList<PendingWay> allWays = sv->getAllWays();
+            
+            // Находим выбранную дорогу по ID первого узла или по названию
+            PendingWay selectedWay;
+            bool found = false;
+            for (const PendingWay &way : allWays) {
+                if (!way.nodeRefs.isEmpty() && way.nodeRefs.first() == selectedWayId) {
+                    selectedWay = way;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) continue;
+            
+            // Находим все светофоры на этой дороге
+            for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
+                long long tlId = it.key();
+                long long osmNodeId = sv->getTrafficLightOsmNodeId(tlId);
+                
+                // Проверяем, принадлежит ли светофор к выбранной дороге
+                if (selectedWay.nodeRefs.contains(osmNodeId)) {
+                    affectedTrafficLights.insert(tlId);
+                }
+            }
+            
+            // ТЕПЕРЬ: Находим все дороги, которые пересекаются с выбранной
+            // (имеют общие узлы со светофорами)
+            for (const PendingWay &otherWay : allWays) {
+                if (otherWay.nodeRefs == selectedWay.nodeRefs) continue; // пропускаем саму дорогу
+                
+                // Проверяем пересечение по узлам
+                bool hasIntersection = false;
+                for (long long nodeId : otherWay.nodeRefs) {
+                    if (selectedWay.nodeRefs.contains(nodeId)) {
+                        hasIntersection = true;
+                        break;
+                    }
+                }
+                
+                if (hasIntersection) {
+                    // Добавляем все светофоры на пересекающейся дороге
+                    for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
+                        long long tlId = it.key();
+                        long long osmNodeId = sv->getTrafficLightOsmNodeId(tlId);
+                        
+                        if (otherWay.nodeRefs.contains(osmNodeId)) {
+                            affectedTrafficLights.insert(tlId);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Применяем настройки ко всем найденным светофорам
+        for (long long tlId : affectedTrafficLights) {
+            sv->setTrafficLightCycle(tlId, green * 1000, yellow * 1000, red * 1000);
+        }
+
+        QMessageBox::information(this, "Применено",
+                                 QString("Параметры обновлены для выбранных направлений (%1 шт.):\n"
+                                         "🟢 Зелёный: %2 сек\n"
+                                         "🟡 Жёлтый: %3 сек\n"
+                                         "🔴 Красный: %4 сек")
+                                     .arg(affectedTrafficLights.size())
+                                     .arg(green).arg(yellow).arg(red));
+
+        qDebug() << "[APPLY SELECTED] Applied to" << affectedTrafficLights.size() << "traffic lights"
+                 << "G:" << green << "s Y:" << yellow << "s R:" << red;
+    }
     // 3. Применяем
     applySettingsToTrafficLights(targetTls, green, yellow, red);
 
@@ -333,6 +485,34 @@ void TrafficLightControlWidget::onResetClicked()
     // 2. Сбрасываем
     resetSettingsForTrafficLights(targetTls);
 
+    if (resetAll) {
+        // Сбрасываем все светофоры на участке (аналогично ночному режиму)
+        QSet<long long> affectedTrafficLights;
+        
+        // Получаем все дороги и собираем все узлы дорог участка
+        QList<PendingWay> allWays = sv->getAllWays();
+        QSet<long long> allSectionNodes;
+        
+        for (const PendingWay &way : allWays) {
+            for (long long nodeId : way.nodeRefs) {
+                allSectionNodes.insert(nodeId);
+            }
+        }
+        
+        // Находим все светофоры, которые принадлежат этим узлам
+        for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
+            long long tlId = it.key();
+            long long osmNodeId = sv->getTrafficLightOsmNodeId(tlId);
+            
+            if (allSectionNodes.contains(osmNodeId)) {
+                affectedTrafficLights.insert(tlId);
+            }
+        }
+        
+        // Сбрасываем настройки для всех найденных светофоров
+        for (long long tlId : affectedTrafficLights) {
+            sv->resetTrafficLightCycle(tlId);
+        }
     // 3. Возвращаем поля ввода к дефолту
     m_greenInput->setText("30");
     m_yellowInput->setText("3");
@@ -341,6 +521,74 @@ void TrafficLightControlWidget::onResetClicked()
     // 4. Показываем результат
     QMessageBox::information(this, "Сброшено", formatResetMessage(targetTls));
 
+        QMessageBox::information(this, "Сброшено",
+                                 QString("Параметры всех светофоров участка (%1 шт.) возвращены к значениям по умолчанию:\n"
+                                         "🟢 Зелёный: 30 сек\n"
+                                         "🟡 Жёлтый: 3 сек\n"
+                                         "🔴 Красный: 30 сек")
+                                     .arg(affectedTrafficLights.size()));
+
+        qDebug() << "[RESET ALL] Reset" << affectedTrafficLights.size() << "traffic lights to default";
+    } else {
+        // Сбрасываем только выбранные направления - включая дороги с пересечениями
+        QSet<long long> affectedTrafficLights;
+        
+        for (long long selectedWayId : selectedWayIds) {
+            // Получаем все дороги
+            QList<PendingWay> allWays = sv->getAllWays();
+            
+            // Находим выбранную дорогу по ID первого узла
+            PendingWay selectedWay;
+            bool found = false;
+            for (const PendingWay &way : allWays) {
+                if (!way.nodeRefs.isEmpty() && way.nodeRefs.first() == selectedWayId) {
+                    selectedWay = way;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) continue;
+            
+            // Находим все светофоры на этой дороге
+            for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
+                long long tlId = it.key();
+                long long osmNodeId = sv->getTrafficLightOsmNodeId(tlId);
+                
+                if (selectedWay.nodeRefs.contains(osmNodeId)) {
+                    affectedTrafficLights.insert(tlId);
+                }
+            }
+            
+            // Находим дороги, которые пересекаются с выбранной
+            for (const PendingWay &otherWay : allWays) {
+                if (otherWay.nodeRefs == selectedWay.nodeRefs) continue;
+                
+                bool hasIntersection = false;
+                for (long long nodeId : otherWay.nodeRefs) {
+                    if (selectedWay.nodeRefs.contains(nodeId)) {
+                        hasIntersection = true;
+                        break;
+                    }
+                }
+                
+                if (hasIntersection) {
+                    for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
+                        long long tlId = it.key();
+                        long long osmNodeId = sv->getTrafficLightOsmNodeId(tlId);
+                        
+                        if (otherWay.nodeRefs.contains(osmNodeId)) {
+                            affectedTrafficLights.insert(tlId);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Сбрасываем настройки для всех найденных светофоров
+        for (long long tlId : affectedTrafficLights) {
+            sv->resetTrafficLightCycle(tlId);
+        }
     qDebug() << "[RESET] Reset" << targetTls.size() << "traffic light(s) to default";
 }
 
@@ -353,6 +601,15 @@ void TrafficLightControlWidget::onWaySelected()
     m_crossingList->clearSelection();
     m_crossingList->setCurrentItem(nullptr);
 
+        QMessageBox::information(this, "Сброшено",
+                                 QString("Параметры для выбранных направлений (%1 шт.) возвращены к значениям по умолчанию:\\n"
+                                         "🟢 Зелёный: 30 сек\\n"
+                                         "🟡 Жёлтый: 3 сек\\n"
+                                         "🔴 Красный: 30 сек")
+                                     .arg(affectedTrafficLights.size()));
+
+        qDebug() << "[RESET SELECTED] Reset" << affectedTrafficLights.size() << "traffic lights to default";
+    }
     // Возвращаем заголовок к исходному состоянию
     m_paramsGroupBox->setTitle("Параметры светофора");
 
@@ -506,6 +763,40 @@ void TrafficLightControlWidget::sortCrossingList()
     }
 }
 
+bool TrafficLightControlWidget::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == m_crossingList->viewport() && event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+        QModelIndex index = m_crossingList->indexAt(mouseEvent->pos());
+        
+        // Если клик вне элемента списка - сбрасываем выделение
+        if (!index.isValid()) {
+            resetSelection();
+            return true;
+        }
+    }
+    
+    // Также обрабатываем клики в списке направлений для сброса выделения светофора
+    if (obj == m_priorityList->viewport() && event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+        QModelIndex index = m_priorityList->indexAt(mouseEvent->pos());
+        
+        // Если клик по элементу списка направлений - сбрасываем выбранный ID светофора
+        // чтобы применение настроек шло только по выбранным дорогам
+        if (index.isValid()) {
+            m_selectedCrossingId = -1;
+            m_crossingList->clearSelection();
+            m_crossingList->setCurrentItem(nullptr);
+            
+            // Сбрасываем чекбоксы всех направлений при выборе нового направления
+            for (int i = 0; i < m_priorityList->count(); ++i) {
+                QListWidgetItem *wayItem = m_priorityList->item(i);
+                wayItem->setCheckState(Qt::Unchecked);
+            }
+        }
+    }
+    
+    return QWidget::eventFilter(obj, event);
 bool TrafficLightControlWidget::validatePhaseTimes(int green, int yellow, int red, QString &error)
 {
     if (green <= 5 || green >= 120) {
