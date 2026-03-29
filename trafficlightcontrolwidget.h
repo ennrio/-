@@ -38,6 +38,7 @@ private:
     QLineEdit *m_greenInput, *m_yellowInput, *m_redInput;
     QListWidget *m_crossingList;      // ОДИН список для перекрёстков
     QListWidget *m_priorityList;
+    QCheckBox *m_allDirectionsCheckbox;  // Чекбокс "Все направления участка дороги"
     QPushButton *m_applyButton, *m_resetButton, *m_diagnosticsButton;
 
     SimulationView* sv;

@@ -1,14 +1,1 @@
-build/
-.qtcreator/
-*.user
-*.pro.user
-
-# Backup files
-*.orig
-*_BACKUP_*
-*_BASE_*
-*_LOCAL_*
-*_REMOTE_*
-
-# CMake
-CMakeLists.txt.user*.qtcreator/
+Nothing needs to be added to .gitignore since only source code files (.cpp and .h) were modified, which should not be ignored.
