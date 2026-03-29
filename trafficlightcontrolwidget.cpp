@@ -4,6 +4,7 @@
 #include <QGridLayout>
 #include <QFont>
 #include <QMessageBox>
+#include <QCheckBox>
 #include "constants.h"
 #include <QDebug>
 
@@ -11,6 +12,7 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
     : QWidget(parent)
     , sv(nullptr)
     , m_selectedCrossingId(-1)
+    , m_allDirectionsCheckbox(nullptr)
 {
     setStyleSheet("background-color: #2B2B2B; color: #FFFFFF;");
 
@@ -90,15 +92,23 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
     phasesLayout->addWidget(m_redInput, 2, 1);
     paramsLayout->addLayout(phasesLayout);
 
-    // Приоритетные направления
-    m_priorityGroupBox = new QGroupBox("Приоритетные направления:");
+    // Направления
+    m_priorityGroupBox = new QGroupBox("Направления:");
     m_priorityGroupBox->setStyleSheet("QGroupBox { border: 1px solid #404040; border-radius: 4px; }");
 
     QVBoxLayout *priorityLayout = new QVBoxLayout(m_priorityGroupBox);
+    
+    // Чекбокс "Все направления"
+    m_allDirectionsCheckbox = new QCheckBox("Все направления участка дороги");
+    m_allDirectionsCheckbox->setStyleSheet("color: white; font-weight: bold;");
+    m_allDirectionsCheckbox->setEnabled(false);
+    
     m_priorityList = new QListWidget;
     m_priorityList->setStyleSheet("background-color: #303030; border: 1px solid #404040;");
     m_priorityList->setMaximumHeight(100);
     m_priorityList->setEnabled(false);
+    
+    priorityLayout->addWidget(m_allDirectionsCheckbox);
     priorityLayout->addWidget(m_priorityList);
     paramsLayout->addWidget(m_priorityGroupBox);
 
@@ -245,8 +255,18 @@ void TrafficLightControlWidget::onCrossingSelected()
         m_yellowInput->setEnabled(true);
         m_redInput->setEnabled(true);
         m_priorityList->setEnabled(true);
+        m_allDirectionsCheckbox->setEnabled(true);
         m_applyButton->setEnabled(true);
         m_resetButton->setEnabled(true);
+        
+        // Подключаем чекбокс к логике применения
+        connect(m_allDirectionsCheckbox, &QCheckBox::stateChanged, this, [this](int state) {
+            if (state == Qt::Checked) {
+                m_priorityList->setEnabled(false);
+            } else {
+                m_priorityList->setEnabled(true);
+            }
+        });
     }
 }
 
@@ -272,8 +292,8 @@ void TrafficLightControlWidget::updateCrossingStatus(long long tlId, bool requir
 
 void TrafficLightControlWidget::onApplyClicked()
 {
-    if (!m_selectedCrossingId || !sv) {
-        QMessageBox::warning(this, "Ошибка", "Светофор не выбран");
+    if (!sv) {
+        QMessageBox::warning(this, "Ошибка", "SimulationView не найден");
         return;
     }
 
@@ -295,42 +315,99 @@ void TrafficLightControlWidget::onApplyClicked()
         return;
     }
 
-    // Отправляем в SimulationView (в миллисекундах)
-    sv->setTrafficLightCycle(m_selectedCrossingId, green * 1000, yellow * 1000, red * 1000);
+    // Проверяем, выбран ли режим "Все направления участка дороги"
+    bool applyToAll = m_allDirectionsCheckbox && m_allDirectionsCheckbox->isChecked();
 
-    QMessageBox::information(this, "Применено",
-                             QString("Параметры для %1 обновлены:\n"
-                                     "🟢 Зелёный: %2 сек\n"
-                                     "🟡 Жёлтый: %3 сек\n"
-                                     "🔴 Красный: %4 сек")
-                                 .arg(m_crossingsMap[m_selectedCrossingId].name)
-                                 .arg(green).arg(yellow).arg(red));
+    if (applyToAll) {
+        // Применяем ко всем светофорам на участке
+        for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
+            long long tlId = it.key();
+            sv->setTrafficLightCycle(tlId, green * 1000, yellow * 1000, red * 1000);
+        }
 
-    qDebug() << "[APPLY] TL" << m_selectedCrossingId
-             << "G:" << green << "s Y:" << yellow << "s R:" << red;
+        QMessageBox::information(this, "Применено",
+                                 QString("Параметры обновлены для всех светофоров (%1 шт.):\n"
+                                         "🟢 Зелёный: %2 сек\n"
+                                         "🟡 Жёлтый: %3 сек\n"
+                                         "🔴 Красный: %4 сек")
+                                     .arg(m_crossingsMap.size())
+                                     .arg(green).arg(yellow).arg(red));
+
+        qDebug() << "[APPLY ALL] Applied to" << m_crossingsMap.size() << "traffic lights"
+                 << "G:" << green << "s Y:" << yellow << "s R:" << red;
+    } else {
+        // Применяем только к выбранному светофору
+        if (!m_selectedCrossingId) {
+            QMessageBox::warning(this, "Ошибка", "Светофор не выбран");
+            return;
+        }
+
+        sv->setTrafficLightCycle(m_selectedCrossingId, green * 1000, yellow * 1000, red * 1000);
+
+        QMessageBox::information(this, "Применено",
+                                 QString("Параметры для %1 обновлены:\n"
+                                         "🟢 Зелёный: %2 сек\n"
+                                         "🟡 Жёлтый: %3 сек\n"
+                                         "🔴 Красный: %4 сек")
+                                     .arg(m_crossingsMap[m_selectedCrossingId].name)
+                                     .arg(green).arg(yellow).arg(red));
+
+        qDebug() << "[APPLY] TL" << m_selectedCrossingId
+                 << "G:" << green << "s Y:" << yellow << "s R:" << red;
+    }
 }
 
 void TrafficLightControlWidget::onResetClicked()
 {
-    if (m_selectedCrossingId < 0 || !sv) {
-        QMessageBox::warning(this, "Ошибка", "Светофор не выбран");
+    if (!sv) {
+        QMessageBox::warning(this, "Ошибка", "SimulationView не найден");
         return;
     }
 
-    // Сбрасываем к стандартным значениям (30/3/30)
-    sv->resetTrafficLightCycle(m_selectedCrossingId);
+    // Проверяем, выбран ли режим "Все направления участка дороги"
+    bool resetAll = m_allDirectionsCheckbox && m_allDirectionsCheckbox->isChecked();
 
-    m_greenInput->setText("30");
-    m_yellowInput->setText("3");
-    m_redInput->setText("30");
+    if (resetAll) {
+        // Сбрасываем все светофоры на участке
+        for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
+            long long tlId = it.key();
+            sv->resetTrafficLightCycle(tlId);
+        }
 
-    QMessageBox::information(this, "Сброшено",
-                             "Параметры светофора возвращены к значениям по умолчанию:\n"
-                             "🟢 Зелёный: 30 сек\n"
-                             "🟡 Жёлтый: 3 сек\n"
-                             "🔴 Красный: 30 сек");
+        m_greenInput->setText("30");
+        m_yellowInput->setText("3");
+        m_redInput->setText("30");
 
-    qDebug() << "[RESET] TL" << m_selectedCrossingId << "reset to default";
+        QMessageBox::information(this, "Сброшено",
+                                 QString("Параметры всех светофоров (%1 шт.) возвращены к значениям по умолчанию:\n"
+                                         "🟢 Зелёный: 30 сек\n"
+                                         "🟡 Жёлтый: 3 сек\n"
+                                         "🔴 Красный: 30 сек")
+                                     .arg(m_crossingsMap.size()));
+
+        qDebug() << "[RESET ALL] Reset" << m_crossingsMap.size() << "traffic lights to default";
+    } else {
+        // Сбрасываем только выбранный светофор
+        if (m_selectedCrossingId < 0) {
+            QMessageBox::warning(this, "Ошибка", "Светофор не выбран");
+            return;
+        }
+
+        // Сбрасываем к стандартным значениям (30/3/30)
+        sv->resetTrafficLightCycle(m_selectedCrossingId);
+
+        m_greenInput->setText("30");
+        m_yellowInput->setText("3");
+        m_redInput->setText("30");
+
+        QMessageBox::information(this, "Сброшено",
+                                 "Параметры светофора возвращены к значениям по умолчанию:\n"
+                                 "🟢 Зелёный: 30 сек\n"
+                                 "🟡 Жёлтый: 3 сек\n"
+                                 "🔴 Красный: 30 сек");
+
+        qDebug() << "[RESET] TL" << m_selectedCrossingId << "reset to default";
+    }
 }
 
 void TrafficLightControlWidget::updateCrossingListItem(long long id)
