@@ -1026,6 +1026,8 @@ void SimulationView::processOsmChunk()
 
                         // === ОТРИСОВКА СВЕТОФОРА ===
                         if (isTrafficLight) {
+                            m_nodesWithTrafficLights.insert(id);  // Сохраняем узел со светофором
+                            
                             auto* tl = new TrafficLight(id, scenePos, direction, isPedestrian, this);
                             m_trafficLights[tl->id()] = tl;
                             m_trafficLightOsmId[tl->id()] = id;
@@ -1142,6 +1144,7 @@ void SimulationView::processOsmChunk()
                     PendingWay pending;
                     pending.nodeRefs = nodeRefs;
                     pending.highwayType = highwayType;
+                    pending.name = wayName;  // Сохраняем имя дороги
                     pending.isOneWay = isOneWay;
                     m_tempWays.append(pending);
                     waysFoundInChunk++;
@@ -1366,9 +1369,37 @@ void SimulationView::resetTrafficLightCycle(long long id)
      setTrafficLightCycle(id, 30000, 5000, 25000);
 }
 
+long long SimulationView::getTrafficLightOsmNodeId(long long tlId) const
+{
+    if (m_trafficLightOsmId.contains(tlId)) {
+        return m_trafficLightOsmId[tlId];
+    }
+    return -1;
+}
+
 QList<PendingWay> SimulationView::getAllWays() const
 {
-    return m_tempWays;
+    // Возвращаем только дороги, на которых есть светофоры
+    QList<PendingWay> waysWithTrafficLights;
+    
+    for (const PendingWay &way : m_tempWays) {
+        if (hasTrafficLightsOnWay(way.nodeRefs)) {
+            waysWithTrafficLights.append(way);
+        }
+    }
+    
+    return waysWithTrafficLights;
+}
+
+bool SimulationView::hasTrafficLightsOnWay(const QList<long long> &nodeRefs) const
+{
+    // Проверяем, есть ли хотя бы один узел дороги в наборе узлов со светофорами
+    for (long long nodeId : nodeRefs) {
+        if (m_nodesWithTrafficLights.contains(nodeId)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 SimulationView::TrafficLightCycle SimulationView::getTrafficLightCycle(long long id) const

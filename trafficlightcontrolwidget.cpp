@@ -472,7 +472,14 @@ void TrafficLightControlWidget::loadCrossingParams(long long id)
         
         // Добавляем каждое направление как элемент списка с чекбоксом
         for (const PendingWay &way : allWays) {
-            QString directionName = QString("Дорога: %1").arg(way.highwayType);
+            // Формируем красивое имя дороги
+            QString directionName;
+            if (!way.name.isEmpty()) {
+                directionName = way.name;  // Используем название улицы (например, "Невский проспект")
+            } else {
+                directionName = QString("Дорога: %1").arg(way.highwayType);
+            }
+            
             if (way.isOneWay) {
                 directionName += " (односторонняя)";
             }
