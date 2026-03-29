@@ -181,6 +181,12 @@ void TrafficLightControlWidget::syncWithSimulation()
         updateCrossingListItem(id);
     }
     sortCrossingList();
+
+    if (m_crossingList->count() > 0) {
+        QListWidgetItem *firstItem = m_crossingList->item(0);
+        m_crossingList->setCurrentItem(firstItem);
+        onCrossingSelected();
+    }
 }
 
 void TrafficLightControlWidget::onModeChanged(const QString &modeText)
