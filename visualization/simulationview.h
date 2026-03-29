@@ -82,6 +82,9 @@ public:
     void setTrafficLightCycle(long long id, int greenMs, int yellowMs, int redMs);
     void resetTrafficLightCycle(long long id);
     
+    //получение OSM ID узла для светофора
+    long long getTrafficLightOsmNodeId(long long tlId) const;
+    
     //получение списка направлений (дорог)
     QList<PendingWay> getAllWays() const;
 
@@ -125,6 +128,7 @@ private:
     QMap<int, TrafficLight*> m_trafficLights; // Кэш светофоров
     QMap<int, QGraphicsEllipseItem*> m_trafficLightItems; // view
     QMap<int, TrafficLightController*> m_controllers;  // логика
+    QSet<long long> m_nodesWithTrafficLights;  // Узлы, где есть светофоры
     static constexpr qint64 VEHICLE_HIDE_TIMEOUT_MS = 30 * 60 * 1000;
 
     QColor colorForState(LightState state);
@@ -170,6 +174,9 @@ private:
     QMap<long long, QPointF> m_tempNodes; // Временные узлы текущей порции
     QList<PendingWay> m_tempWays;         // Временные дороги текущей порции
     int m_internalIdCounter;              // Счетчик внутренних ID
+    
+    // Метод для проверки наличия светофоров на дороге
+    bool hasTrafficLightsOnWay(const QList<long long> &nodeRefs) const;
 
     // МАШИНЫ
     QTimer m_vehicleSpawnTimer;
