@@ -47,6 +47,10 @@ private:
     void updateCrossingListItem(long long id);
     void loadCrossingParams(long long id);
     void sortCrossingList();
+    void resetSelection();
+    
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override;
 };
 
 #endif // TRAFFICLIGHTCONTROLWIDGET_H

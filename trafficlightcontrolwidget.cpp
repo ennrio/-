@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QCheckBox>
 #include <QSet>
+#include <QMouseEvent>
 #include "constants.h"
 #include <QDebug>
 
@@ -64,6 +65,9 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
         );
     //m_crossingList->setMaximumHeight(200);
     connect(m_crossingList, &QListWidget::itemClicked, this, &TrafficLightControlWidget::onCrossingSelected);
+    
+    // Устанавливаем фильтр событий для списка перекрёстков, чтобы отлавливать клики вне элементов
+    m_crossingList->viewport()->installEventFilter(this);
 
     controlLayout->addWidget(m_crossingList);
     m_controlGroupBox->setLayout(controlLayout);
@@ -254,6 +258,29 @@ void TrafficLightControlWidget::onCrossingSelected()
     }
 }
 
+void TrafficLightControlWidget::resetSelection()
+{
+    // Сбрасываем выделение в списке перекрёстков
+    m_crossingList->clearSelection();
+    m_crossingList->setCurrentItem(nullptr);
+    
+    // Сбрасываем выбранный ID
+    m_selectedCrossingId = -1;
+    
+    // Очищаем заголовок и параметры
+    m_paramsGroupBox->setTitle("Параметры светофора");
+    m_greenInput->setText("30");
+    m_yellowInput->setText("3");
+    m_redInput->setText("30");
+    m_greenInput->setEnabled(false);
+    m_yellowInput->setEnabled(false);
+    m_redInput->setEnabled(false);
+    m_priorityList->clear();
+    m_priorityList->setEnabled(false);
+    m_applyButton->setEnabled(false);
+    m_resetButton->setEnabled(false);
+}
+
 void TrafficLightControlWidget::updateCrossingStatus(long long tlId, bool requiresAttention)
 {
     if (!m_crossingsMap.contains(tlId)) {
@@ -337,14 +364,26 @@ void TrafficLightControlWidget::onApplyClicked()
                  << "G:" << green << "s Y:" << yellow << "s R:" << red;
     } else {
         // Применяем только к выбранным направлениям (светофорам на этих дорогах)
+        int count = 0;
         for (long long wayId : selectedWayIds) {
             // Находим все светофоры, связанные с этим направлением
             for (auto it = m_crossingsMap.begin(); it != m_crossingsMap.end(); ++it) {
                 long long tlId = it.key();
                 CrossingInfo info = it.value();
-                // Проверяем, относится ли светофор к этому направлению
-                if (info.name.contains(QString::number(wayId)) || wayId == tlId) {
-                    sv->setTrafficLightCycle(tlId, green * 1000, yellow * 1000, red * 1000);
+                
+                // Получаем OSM ID светофора и проверяем, принадлежит ли он к этой дороге
+                long long osmNodeId = sv->getTrafficLightOsmNodeId(tlId);
+                
+                // Проверяем, содержится ли OSM узел светофора в списке узлов дороги
+                QList<PendingWay> allWays = sv->getAllWays();
+                for (const PendingWay &way : allWays) {
+                    if (way.nodeRefs.contains(osmNodeId)) {
+                        // Это светофор на нужной дороге
+                        if (way.nodeRefs.first() == wayId || info.name == way.name) {
+                            sv->setTrafficLightCycle(tlId, green * 1000, yellow * 1000, red * 1000);
+                            count++;
+                        }
+                    }
                 }
             }
         }
@@ -354,10 +393,10 @@ void TrafficLightControlWidget::onApplyClicked()
                                          "🟢 Зелёный: %2 сек\n"
                                          "🟡 Жёлтый: %3 сек\n"
                                          "🔴 Красный: %4 сек")
-                                     .arg(selectedWayIds.size())
+                                     .arg(count)
                                      .arg(green).arg(yellow).arg(red));
 
-        qDebug() << "[APPLY SELECTED] Applied to" << selectedWayIds.size() << "ways"
+        qDebug() << "[APPLY SELECTED] Applied to" << count << "traffic lights"
                  << "G:" << green << "s Y:" << yellow << "s R:" << red;
     }
 }
@@ -571,4 +610,20 @@ void TrafficLightControlWidget::sortCrossingList()
     for (const auto& pair : itemsWithStatus) {
         m_crossingList->addItem(pair.first);
     }
+}
+
+bool TrafficLightControlWidget::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == m_crossingList->viewport() && event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+        QModelIndex index = m_crossingList->indexAt(mouseEvent->pos());
+        
+        // Если клик вне элемента списка - сбрасываем выделение
+        if (!index.isValid()) {
+            resetSelection();
+            return true;
+        }
+    }
+    
+    return QWidget::eventFilter(obj, event);
 }
