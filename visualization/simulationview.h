@@ -21,6 +21,7 @@
 struct PendingWay {
     QList<long long> nodeRefs;
     QString highwayType;
+    QString name;  // Название дороги
     bool isOneWay{false};
 };
 
