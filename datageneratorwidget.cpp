@@ -239,7 +239,8 @@ void DataGeneratorWidget::onProbabilityChanged(const QString &text)
         // Парсим текст вероятности (например, "10%" -> 0.1)
         double probability = 0.0;
         if (text.contains("%")) {
-            probability = text.remove("%").toDouble() / 100.0;
+            QString temp = text;  // Копия, уже не const
+            probability = temp.remove("%").toDouble() / 100.0;
         }
         manager.accidentManager()->setAccidentProbability(probability);
         qDebug() << "Accident probability set to:" << probability;
