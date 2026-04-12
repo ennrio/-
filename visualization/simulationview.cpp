@@ -1402,6 +1402,12 @@ bool SimulationView::hasTrafficLightsOnWay(const QList<long long> &nodeRefs) con
     return false;
 }
 
+QMap<long long, QPointF> SimulationView::getAllNodePositions() const
+{
+    // Возвращаем копию всех позиций узлов для использования в AccidentManager
+    return m_osmNodePositions;
+}
+
 SimulationView::TrafficLightCycle SimulationView::getTrafficLightCycle(long long id) const
 {
     TrafficLightCycle cycle = {30000, 5000, 25000};

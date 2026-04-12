@@ -7,6 +7,7 @@
 #include <QCheckBox>
 #include <QPushButton>
 #include <QGroupBox>
+#include <QLabel>
 
 class DataGeneratorWidget : public QWidget
 {
@@ -14,6 +15,13 @@ class DataGeneratorWidget : public QWidget
 
 public:
     explicit DataGeneratorWidget(QWidget *parent = nullptr);
+
+private slots:
+    void stopGeneration();
+    void onStartAccidentSimulation();
+    void onStopAccidentSimulation();
+    void onCreateAccident();
+    void onProbabilityChanged(const QString &text);
 
 private:
     QComboBox *m_profileCombo;
@@ -26,9 +34,10 @@ private:
     QCheckBox *m_eventsCheck;
     QCheckBox *m_equipmentCheck;
     QComboBox *m_frequencyCombo;
+    QComboBox *m_probabilityCombo;  // Вероятность ДТП
     QPushButton *m_startBtn, *m_stopBtn, *m_generateBtn;
-private slots:
-    void stopGeneration();
+    QPushButton *m_createAccidentBtn;  // Кнопка создания ДТП
+    QLabel *m_accidentCountLabel;      // Метка количества активных ДТП
 };
 
 #endif // DATAGENERATORWIDGET_H

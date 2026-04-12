@@ -87,6 +87,9 @@ public:
     
     //получение списка направлений (дорог)
     QList<PendingWay> getAllWays() const;
+    
+    // Получить все позиции узлов дорог (для AccidentManager)
+    QMap<long long, QPointF> getAllNodePositions() const;
 
 //MEMBERS
 public:

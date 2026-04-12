@@ -22,6 +22,12 @@ SimulationView* SimulationManager::simulationView() const
 void SimulationManager::setSimulationView(SimulationView* view)
 {
     m_simulationView = view;
+    
+    // Инициализируем менеджер ДТП при установке view
+    if (view && !m_accidentManager) {
+        m_accidentManager = new AccidentManager();
+        m_accidentManager->setSimulationView(view);
+    }
 }
 
 void SimulationManager::stopSimulationView()
@@ -90,4 +96,35 @@ void SimulationManager::setMaxVehicleLimit(int limit)
     if (!m_simulationView) return;
    // m_simulationView->setMaxVehicleLimit(limit);
     qDebug() << "Manager: Max vehicle limit set to" << limit;
+}
+
+// ============================================================================
+// Accident Management Methods
+// ============================================================================
+
+AccidentManager* SimulationManager::accidentManager() const
+{
+    return m_accidentManager;
+}
+
+void SimulationManager::createAccident(const QPointF &position, long long nodeId, const QString &severity)
+{
+    if (m_accidentManager) {
+        m_accidentManager->createAccident(position, nodeId, severity);
+    }
+}
+
+void SimulationManager::resolveAccident(int accidentId)
+{
+    if (m_accidentManager) {
+        m_accidentManager->resolveAccident(accidentId);
+    }
+}
+
+int SimulationManager::getActiveAccidentsCount() const
+{
+    if (m_accidentManager) {
+        return m_accidentManager->getActiveAccidentsCount();
+    }
+    return 0;
 }
