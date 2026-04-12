@@ -376,7 +376,24 @@ void SimulationView::updateSimulation()
             VehicleItem* item = m_vehicleItems[id];
 
             if (vehicle->isRouteFinished()) {
-                item->setColor(Qt::blue);
+                // Проверяем, является ли парковка неправильной
+                bool isWrongParked = m_wrongParkedVehicles.contains(id);
+                
+                // Если машина только что завершила маршрут и была кандидатом на неправильную парковку
+                if (!isWrongParked && !m_wrongParkedVehicles.contains(id) && 
+                    vehicle->property("wrongParkingCandidate").toBool() && m_wrongParkingEnabled) {
+                    // Добавляем в список неправильно припаркованных
+                    m_wrongParkedVehicles.append(id);
+                    isWrongParked = true;
+                }
+                
+                if (isWrongParked) {
+                    // Неправильная парковка - красный маркер
+                    item->setColor(Qt::red);
+                } else {
+                    // Правильная парковка - синий цвет
+                    item->setColor(Qt::blue);
+                }
 
                 if (currentMsecs - vehicle->finishedTimestamp() > VEHICLE_HIDE_TIMEOUT_MS) {
                     item->hide();
@@ -395,6 +412,11 @@ void SimulationView::updateSimulation()
     // Обновляем маркеры ДТП на карте
     if (m_accidentManager) {
         updateAccidentMarkers();
+    }
+    
+    // Обновляем маркеры неправильной парковки
+    if (m_wrongParkingEnabled) {
+        updateWrongParkingMarkers();
     }
 
     m_scene->update();
@@ -539,6 +561,16 @@ void SimulationView::onRouteCalculationFinished()
         v->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
         v->setAcceleration(3.5);
         v->setDeceleration(5.0);
+        
+        // Проверяем вероятность неправильной парковки при создании машины
+        if (m_wrongParkingEnabled && !v->isRouteFinished()) {
+            double randomValue = QRandomGenerator::global()->generateDouble();
+            if (randomValue < m_wrongParkingProbability) {
+                // Помечаем машину как кандидат на неправильную парковку
+                // Фактическая парковка будет определена когда машина завершит маршрут
+                v->setProperty("wrongParkingCandidate", true);
+            }
+        }
     }
 
     qDebug() << "Vehicle" << vehicleId << "spawned with route of"
@@ -1499,4 +1531,15 @@ SimulationView::TrafficLightCycle SimulationView::getTrafficLightCycle(long long
     return cycle;
 }
 
+void SimulationView::setWrongParkingEnabled(bool enabled)
+{
+    m_wrongParkingEnabled = enabled;
+    qDebug() << "Wrong parking simulation" << (enabled ? "enabled" : "disabled");
+}
+
+void SimulationView::setWrongParkingProbability(double probability)
+{
+    m_wrongParkingProbability = qBound(0.0, probability, 1.0);
+    qDebug() << "Wrong parking probability set to:" << m_wrongParkingProbability;
+}
 

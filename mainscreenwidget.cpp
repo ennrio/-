@@ -75,10 +75,10 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     // Активные инциденты
     QLabel *incidentsLabel = new QLabel("Активные инциденты");
     incidentsLabel->setStyleSheet("color: #CC0000; font-weight: bold;");
-    QLabel *incidentsCount = new QLabel("TODO");
-    incidentsCount->setStyleSheet("color: #CC0000; font-size: 12px;");
+    m_incidentsCount = new QLabel("0");
+    m_incidentsCount->setStyleSheet("color: #CC0000; font-size: 12px;");
     metricsLayout->addWidget(incidentsLabel, 1, 0);
-    metricsLayout->addWidget(incidentsCount, 1, 1);
+    metricsLayout->addWidget(m_incidentsCount, 1, 1);
 
     // Средняя скорость
     speedLabel = new QLabel("Средняя скорость");
@@ -254,4 +254,8 @@ void MainScreenWidget::updateMainScreen()
     }
     loadCount->setText(QString::number(loading_road) + " %"); //TODO нужно брать значение от истор максимума или от среднеквадратичного отклонения, по хорошему вообще расчитывать для каждой дороги по отдельности
     speedCount->setText(QString::number(m_simulationView->getAverageSpeed()) + " км/ч");
+    
+    // Обновляем количество активных инцидентов (ДТП)
+    int activeAccidents = SimulationManager::instance().getActiveAccidentsCount();
+    m_incidentsCount->setText(QString::number(activeAccidents));
 }

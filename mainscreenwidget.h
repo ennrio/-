@@ -36,6 +36,7 @@ private:
     QLabel *speedCount;
     QLabel *loadCount;
     QLabel *m_operatorLabel;
+    QLabel *m_incidentsCount;  // Количество активных инцидентов
     SimulationView* m_simulationView;
     QLabel *m_alertLabel;
 
