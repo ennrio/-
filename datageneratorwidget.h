@@ -8,6 +8,7 @@
 #include <QPushButton>
 #include <QGroupBox>
 #include <QLabel>
+#include <QTimer>
 
 class DataGeneratorWidget : public QWidget
 {
@@ -15,29 +16,30 @@ class DataGeneratorWidget : public QWidget
 
 public:
     explicit DataGeneratorWidget(QWidget *parent = nullptr);
+    void updateStatus(bool isGenerating, int activeAccidents);
 
 private slots:
+    void startGeneration();
     void stopGeneration();
-    void onStartAccidentSimulation();
-    void onStopAccidentSimulation();
-    void onCreateAccident();
+    void onAccidentToggled(bool checked);
     void onProbabilityChanged(const QString &text);
+    void onSaveProfile();
+    void onLoadProfile();
+    void updateAccidentCount();
 
 private:
     QComboBox *m_profileCombo;
     QComboBox *m_intensityCombo;
-    QComboBox *m_weatherCombo;
-    QComboBox *m_timeCombo;
     QLineEdit *m_intervalInput;
     QCheckBox *m_accidentCheck;
-    QCheckBox *m_repairCheck;
-    QCheckBox *m_eventsCheck;
-    QCheckBox *m_equipmentCheck;
-    QComboBox *m_frequencyCombo;
     QComboBox *m_probabilityCombo;  // Вероятность ДТП
-    QPushButton *m_startBtn, *m_stopBtn, *m_generateBtn;
-    QPushButton *m_createAccidentBtn;  // Кнопка создания ДТП
+    QPushButton *m_startBtn, *m_stopBtn;
+    QPushButton *m_saveProfileBtn, *m_loadProfileBtn;
+    QLabel *m_statusLabel;
     QLabel *m_accidentCountLabel;      // Метка количества активных ДТП
+    QTimer *m_updateTimer;
+    
+    bool m_isGenerating;
 };
 
 #endif // DATAGENERATORWIDGET_H

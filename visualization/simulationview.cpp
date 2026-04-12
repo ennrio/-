@@ -29,6 +29,7 @@ SimulationView::SimulationView(QWidget *parent)
     , m_currentPhase(LoadPhase::ParsingNodes)
     , m_internalIdCounter(1)
     , m_roadGraph(new RoadGraph())
+    , m_accidentManager(nullptr)
 {
     setScene(m_scene);
     setRenderHint(QPainter::Antialiasing);
@@ -72,11 +73,16 @@ SimulationView::SimulationView(QWidget *parent)
     m_congestionCheckTimer.setInterval(1000);
     connect(&m_congestionCheckTimer, &QTimer::timeout,
             this, &SimulationView::checkTrafficCongestion);
+    
+    // Инициализация менеджера ДТП
+    m_accidentManager = new AccidentManager(this);
+    m_accidentManager->setSimulationView(this);
 }
 
 SimulationView::~SimulationView()
 {
-        delete m_roadGraph;
+    delete m_accidentManager;
+    delete m_roadGraph;
 }
 
 void SimulationView::show()
@@ -354,6 +360,14 @@ void SimulationView::updateSimulation()
 
         // Обновляем физику только активных машин
         if (vehicle->isActive()) {
+            // Проверяем, не влияет ли ДТП на позицию автомобиля
+            if (m_accidentManager && m_accidentManager->isPositionAffected(vehicle->position())) {
+                // Замедляем автомобиль возле ДТП
+                vehicle->setMaxSpeed(2.0); // Очень медленно объезжаем
+            } else {
+                vehicle->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
+            }
+            
             vehicle->update(deltaTime);
         }
 
@@ -376,6 +390,11 @@ void SimulationView::updateSimulation()
                 item->setPos(vehicle->position());
             }
         }
+    }
+
+    // Обновляем маркеры ДТП на карте
+    if (m_accidentManager) {
+        updateAccidentMarkers();
     }
 
     m_scene->update();
@@ -1406,6 +1425,63 @@ QMap<long long, QPointF> SimulationView::getAllNodePositions() const
 {
     // Возвращаем копию всех позиций узлов для использования в AccidentManager
     return m_osmNodePositions;
+}
+
+// Маркеры ДТП на карте
+void SimulationView::updateAccidentMarkers()
+{
+    if (!m_accidentManager) return;
+    
+    // Получаем список активных ДТП
+    QList<Accident> activeAccidents = m_accidentManager->getActiveAccidents();
+    
+    // Временное хранение ID маркеров для текущего кадра
+    static QMap<int, QGraphicsEllipseItem*> accidentMarkers;
+    
+    // Удаляем маркеры для неактивных ДТП
+    QList<int> toRemove;
+    for (auto it = accidentMarkers.begin(); it != accidentMarkers.end(); ++it) {
+        bool found = false;
+        for (const Accident &accident : activeAccidents) {
+            if (accident.id == it.key()) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            m_scene->removeItem(it.value());
+            delete it.value();
+            toRemove.append(it.key());
+        }
+    }
+    for (int id : toRemove) {
+        accidentMarkers.remove(id);
+    }
+    
+    // Создаём или обновляем маркеры для активных ДТП
+    for (const Accident &accident : activeAccidents) {
+        if (!accidentMarkers.contains(accident.id)) {
+            // Создаём новый маркер - красный круг с полупрозрачной зоной влияния
+            QGraphicsEllipseItem *marker = new QGraphicsEllipseItem(
+                -accident.affectedRadius/2, 
+                -accident.affectedRadius/2,
+                accident.affectedRadius,
+                accident.affectedRadius
+            );
+            marker->setPos(accident.position);
+            marker->setPen(QPen(Qt::red, 3));
+            marker->setBrush(QColor(255, 0, 0, 50)); // Полупрозрачный красный
+            marker->setZValue(10); // Выше машин
+            m_scene->addItem(marker);
+            accidentMarkers[accident.id] = marker;
+            
+            qDebug() << "Accident marker created for ID:" << accident.id;
+        } else {
+            // Обновляем позицию существующего маркера
+            QGraphicsEllipseItem *marker = accidentMarkers[accident.id];
+            marker->setPos(accident.position);
+        }
+    }
 }
 
 SimulationView::TrafficLightCycle SimulationView::getTrafficLightCycle(long long id) const

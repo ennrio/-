@@ -4,10 +4,16 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QLabel>
+#include <QFileDialog>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QFile>
+#include <QTextStream>
 #include "simulationmanager.h"
 
 DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     : QWidget(parent)
+    , m_isGenerating(false)
 {
     setStyleSheet("background-color: #2B2B2B; color: #FFFFFF;");
 
@@ -16,9 +22,9 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     mainLayout->setSpacing(12);
 
     // === Верхняя панель статуса ===
-    QLabel *statusLabel = new QLabel("Генерация приостановлена");
-    statusLabel->setAlignment(Qt::AlignCenter);
-    statusLabel->setStyleSheet(
+    m_statusLabel = new QLabel("Генерация приостановлена");
+    m_statusLabel->setAlignment(Qt::AlignCenter);
+    m_statusLabel->setStyleSheet(
         "font-weight: bold; "
         "color: #CC0000; "
         "background-color: #202020; "
@@ -26,7 +32,7 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
         "padding: 8px; "
         "font-size: 14px;"
     );
-    mainLayout->addWidget(statusLabel);
+    mainLayout->addWidget(m_statusLabel);
 
     // === Настройка генерации тестовых данных ===
     QGroupBox *settingsGroupBox = new QGroupBox("Настройка генерации тестовых данных");
@@ -39,11 +45,37 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     QHBoxLayout *profilesLayout = new QHBoxLayout(profilesGroupBox);
 
     m_profileCombo = new QComboBox;
-    m_profileCombo->addItems({"У Утро час пик", "Д День обычный", "В Вечер час пик", "Н Ночной режим", "Ч Чрезвычайная ситуация"});
+    m_profileCombo->addItems({"Профиль 1", "Профиль 2", "Профиль 3", "Профиль 4", "Профиль 5"});
 
     profilesLayout->addWidget(m_profileCombo);
-    profilesLayout->addWidget(new QPushButton("Сохранить профиль"));
-    profilesLayout->addWidget(new QPushButton("Загрузить профиль"));
+    
+    m_saveProfileBtn = new QPushButton("Сохранить профиль");
+    m_saveProfileBtn->setStyleSheet(
+        "QPushButton { "
+        "   background-color: #0077CC; "
+        "   color: white; "
+        "   border-radius: 4px; "
+        "   padding: 8px 16px; "
+        "   font-weight: bold; "
+        "} "
+        "QPushButton:hover { background-color: #0066BB; }"
+    );
+    connect(m_saveProfileBtn, &QPushButton::clicked, this, &DataGeneratorWidget::onSaveProfile);
+    profilesLayout->addWidget(m_saveProfileBtn);
+    
+    m_loadProfileBtn = new QPushButton("Загрузить профиль");
+    m_loadProfileBtn->setStyleSheet(
+        "QPushButton { "
+        "   background-color: #0077CC; "
+        "   color: white; "
+        "   border-radius: 4px; "
+        "   padding: 8px 16px; "
+        "   font-weight: bold; "
+        "} "
+        "QPushButton:hover { background-color: #0066BB; }"
+    );
+    connect(m_loadProfileBtn, &QPushButton::clicked, this, &DataGeneratorWidget::onLoadProfile);
+    profilesLayout->addWidget(m_loadProfileBtn);
 
     settingsLayout->addWidget(profilesGroupBox);
 
@@ -57,56 +89,22 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     m_intensityCombo->addItems({"Низкая (до 500 авт/ч)", "Средняя (500-1500 авт/ч)", "Высокая (1500-3000 авт/ч)", "Очень высокая (3000+ авт/ч)"});
     paramsLayout->addWidget(m_intensityCombo, 0, 1);
 
-    paramsLayout->addWidget(new QLabel("Погодные условия:"), 1, 0);
-    m_weatherCombo = new QComboBox;
-    m_weatherCombo->addItems({"Ясно", "Дождь", "Снег", "Туман", "Гололёд"});
-    paramsLayout->addWidget(m_weatherCombo, 1, 1);
-
-    paramsLayout->addWidget(new QLabel("Время суток:"), 2, 0);
-    m_timeCombo = new QComboBox;
-    m_timeCombo->addItems({"Утро (06:00-10:00)", "День (10:00-16:00)", "Вечер (16:00-00)", "Ночь (22:00-06:00)"});
-    paramsLayout->addWidget(m_timeCombo, 2, 1);
-
-    paramsLayout->addWidget(new QLabel("Интервал обновления данных (сек):"), 3, 0);
+    paramsLayout->addWidget(new QLabel("Интервал обновления данных (сек):"), 1, 0);
     m_intervalInput = new QLineEdit("30");
-    paramsLayout->addWidget(m_intervalInput, 3, 1);
+    paramsLayout->addWidget(m_intervalInput, 1, 1);
 
     settingsLayout->addWidget(paramsGroupBox);
 
-    // Особые события
+    // Особые события - только ДТП
     QGroupBox *eventsGroupBox = new QGroupBox("Особые события");
     eventsGroupBox->setStyleSheet("QGroupBox { border: 1px solid #404040; border-radius: 4px; }");
     QVBoxLayout *eventsLayout = new QVBoxLayout(eventsGroupBox);
 
     m_accidentCheck = new QCheckBox("Имитировать ДТП");
     m_accidentCheck->setStyleSheet("color: #0077CC;");
-    connect(m_accidentCheck, &QCheckBox::toggled, this, [this](bool checked) {
-        if (checked) {
-            onStartAccidentSimulation();
-        } else {
-            onStopAccidentSimulation();
-        }
-    });
+    connect(m_accidentCheck, &QCheckBox::toggled, this, &DataGeneratorWidget::onAccidentToggled);
     eventsLayout->addWidget(m_accidentCheck);
 
-    m_repairCheck = new QCheckBox("Имитировать ремонтные работы");
-    m_repairCheck->setStyleSheet("color: #0077CC;");
-    eventsLayout->addWidget(m_repairCheck);
-
-    m_eventsCheck = new QCheckBox("Имитировать массовые мероприятия");
-    m_eventsCheck->setStyleSheet("color: #0077CC;");
-    eventsLayout->addWidget(m_eventsCheck);
-
-    m_equipmentCheck = new QCheckBox("Имитировать неисправность оборудования");
-    m_equipmentCheck->setStyleSheet("color: #0077CC;");
-    eventsLayout->addWidget(m_equipmentCheck);
-
-    m_frequencyCombo = new QComboBox;
-    m_frequencyCombo->addItems({"Редко (1 событие в час)", "Средне (2-3 события в час)", "Часто (4+ событий в час)"});
-    connect(m_frequencyCombo, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
-            this, &DataGeneratorWidget::onProbabilityChanged);
-    eventsLayout->addWidget(m_frequencyCombo);
-    
     // Вероятность возникновения ДТП
     QLabel *probabilityLabel = new QLabel("Вероятность ДТП:");
     probabilityLabel->setStyleSheet("color: #FFFFFF;");
@@ -130,14 +128,15 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     m_startBtn = new QPushButton("Начать генерацию");
     m_startBtn->setStyleSheet(
         "QPushButton { "
-        "   background-color: #0077CC; "
+        "   background-color: #00AA00; "
         "   color: white; "
         "   border-radius: 4px; "
         "   padding: 8px 16px; "
         "   font-weight: bold; "
         "} "
-        "QPushButton:hover { background-color: #0066BB; }"
+        "QPushButton:hover { background-color: #009900; }"
     );
+    connect(m_startBtn, &QPushButton::clicked, this, &DataGeneratorWidget::startGeneration);
 
     m_stopBtn = new QPushButton("Остановить генерацию");
     m_stopBtn->setStyleSheet(
@@ -149,44 +148,69 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
         "   font-weight: bold; "
         "} "
         "QPushButton:hover { background-color: #AA0000; }"
+        "QPushButton:disabled { background-color: #555555; color: #888888; }"
     );
-
-    m_generateBtn = new QPushButton("Сгенерировать тестовый набор");
-    m_generateBtn->setStyleSheet(
-        "QPushButton { "
-        "   background-color: #0077CC; "
-        "   color: white; "
-        "   border-radius: 4px; "
-        "   padding: 8px 16px; "
-        "   font-weight: bold; "
-        "} "
-        "QPushButton:hover { background-color: #0066BB; }"
-    );
-    
-    m_createAccidentBtn = new QPushButton("Создать ДТП вручную");
-    m_createAccidentBtn->setStyleSheet(
-        "QPushButton { "
-        "   background-color: #CC0000; "
-        "   color: white; "
-        "   border-radius: 4px; "
-        "   padding: 8px 16px; "
-        "   font-weight: bold; "
-        "} "
-        "QPushButton:hover { background-color: #AA0000; }"
-    );
-    connect(m_createAccidentBtn, &QPushButton::clicked, this, &DataGeneratorWidget::onCreateAccident);
+    connect(m_stopBtn, &QPushButton::clicked, this, &DataGeneratorWidget::stopGeneration);
+    m_stopBtn->setEnabled(false);
 
     btnLayout->addWidget(m_startBtn);
     btnLayout->addWidget(m_stopBtn);
-    btnLayout->addWidget(m_generateBtn);
-    btnLayout->addWidget(m_createAccidentBtn);
-
 
     settingsLayout->addLayout(btnLayout);
     settingsGroupBox->setLayout(settingsLayout);
     mainLayout->addWidget(settingsGroupBox);
 
-    connect(m_stopBtn, &QPushButton::clicked, this, &DataGeneratorWidget::stopGeneration);
+    // Таймер для обновления статистики ДТП
+    m_updateTimer = new QTimer(this);
+    connect(m_updateTimer, &QTimer::timeout, this, &DataGeneratorWidget::updateAccidentCount);
+    m_updateTimer->start(1000); // Обновляем каждую секунду
+}
+
+void DataGeneratorWidget::updateStatus(bool isGenerating, int activeAccidents)
+{
+    m_isGenerating = isGenerating;
+    
+    if (isGenerating) {
+        m_statusLabel->setText("Генерация активна");
+        m_statusLabel->setStyleSheet(
+            "font-weight: bold; "
+            "color: #00AA00; "
+            "background-color: #202020; "
+            "border-radius: 4px; "
+            "padding: 8px; "
+            "font-size: 14px;"
+        );
+        m_startBtn->setEnabled(false);
+        m_stopBtn->setEnabled(true);
+    } else {
+        m_statusLabel->setText("Генерация приостановлена");
+        m_statusLabel->setStyleSheet(
+            "font-weight: bold; "
+            "color: #CC0000; "
+            "background-color: #202020; "
+            "border-radius: 4px; "
+            "padding: 8px; "
+            "font-size: 14px;"
+        );
+        m_startBtn->setEnabled(true);
+        m_stopBtn->setEnabled(false);
+    }
+    
+    m_accidentCountLabel->setText(QString("Активных ДТП: %1").arg(activeAccidents));
+}
+
+void DataGeneratorWidget::startGeneration()
+{
+    SimulationView* view = SimulationManager::instance().simulationView();
+    if (view) {
+        view->startSimulation();
+        updateStatus(true, SimulationManager::instance().getActiveAccidentsCount());
+        
+        // Если включена имитация ДТП - запускаем её
+        if (m_accidentCheck->isChecked()) {
+            onAccidentToggled(true);
+        }
+    }
 }
 
 void DataGeneratorWidget::stopGeneration()
@@ -194,41 +218,21 @@ void DataGeneratorWidget::stopGeneration()
     SimulationView* view = SimulationManager::instance().simulationView();
     if (view) {
         view->stopSimulation();
+        updateStatus(false, SimulationManager::instance().getActiveAccidentsCount());
     }
 }
 
-void DataGeneratorWidget::onStartAccidentSimulation()
+void DataGeneratorWidget::onAccidentToggled(bool checked)
 {
     auto& manager = SimulationManager::instance();
     if (manager.accidentManager()) {
-        manager.accidentManager()->setAccidentsEnabled(true);
+        manager.accidentManager()->setAccidentsEnabled(checked);
         
         // Устанавливаем вероятность из комбобокса
         QString probText = m_probabilityCombo->currentText();
         onProbabilityChanged(probText);
         
-        qDebug() << "Accident simulation started";
-    }
-}
-
-void DataGeneratorWidget::onStopAccidentSimulation()
-{
-    auto& manager = SimulationManager::instance();
-    if (manager.accidentManager()) {
-        manager.accidentManager()->setAccidentsEnabled(false);
-        qDebug() << "Accident simulation stopped";
-    }
-}
-
-void DataGeneratorWidget::onCreateAccident()
-{
-    auto& manager = SimulationManager::instance();
-    SimulationView* view = manager.simulationView();
-    
-    if (view && manager.accidentManager()) {
-        // Создаём ДТП в случайном месте
-        manager.createAccident(QPointF(), -1, "Среднее");
-        qDebug() << "Manual accident created";
+        qDebug() << "Accident simulation" << (checked ? "started" : "stopped");
     }
 }
 
@@ -244,4 +248,62 @@ void DataGeneratorWidget::onProbabilityChanged(const QString &text)
         manager.accidentManager()->setAccidentProbability(probability);
         qDebug() << "Accident probability set to:" << probability;
     }
+}
+
+void DataGeneratorWidget::onSaveProfile()
+{
+    QString fileName = QFileDialog::getSaveFileName(this, "Сохранить профиль", 
+                                                     QString(), "JSON Files (*.json)");
+    if (fileName.isEmpty()) return;
+    
+    QJsonObject profile;
+    profile["intensity"] = m_intensityCombo->currentIndex();
+    profile["interval"] = m_intervalInput->text().toInt();
+    profile["accidents_enabled"] = m_accidentCheck->isChecked();
+    profile["accident_probability"] = m_probabilityCombo->currentIndex();
+    
+    QJsonDocument doc(profile);
+    QFile file(fileName);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write(doc.toJson());
+        file.close();
+        qDebug() << "Profile saved to:" << fileName;
+    }
+}
+
+void DataGeneratorWidget::onLoadProfile()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, "Загрузить профиль", 
+                                                     QString(), "JSON Files (*.json)");
+    if (fileName.isEmpty()) return;
+    
+    QFile file(fileName);
+    if (file.open(QIODevice::ReadOnly)) {
+        QByteArray data = file.readAll();
+        file.close();
+        
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonObject profile = doc.object();
+        
+        if (profile.contains("intensity")) {
+            m_intensityCombo->setCurrentIndex(profile["intensity"].toInt());
+        }
+        if (profile.contains("interval")) {
+            m_intervalInput->setText(QString::number(profile["interval"].toInt()));
+        }
+        if (profile.contains("accidents_enabled")) {
+            m_accidentCheck->setChecked(profile["accidents_enabled"].toBool());
+        }
+        if (profile.contains("accident_probability")) {
+            m_probabilityCombo->setCurrentIndex(profile["accident_probability"].toInt());
+        }
+        
+        qDebug() << "Profile loaded from:" << fileName;
+    }
+}
+
+void DataGeneratorWidget::updateAccidentCount()
+{
+    int count = SimulationManager::instance().getActiveAccidentsCount();
+    m_accidentCountLabel->setText(QString("Активных ДТП: %1").arg(count));
 }

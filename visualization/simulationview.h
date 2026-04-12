@@ -17,6 +17,7 @@
 #include <QtConcurrent>
 #include <QFutureWatcher>
 #include "../constants.h"
+#include "../accidentmanager.h"
 
 struct PendingWay {
     QList<long long> nodeRefs;
@@ -90,6 +91,9 @@ public:
     
     // Получить все позиции узлов дорог (для AccidentManager)
     QMap<long long, QPointF> getAllNodePositions() const;
+    
+    // Получить менеджер ДТП
+    AccidentManager* accidentManager() const { return m_accidentManager; }
 
 //MEMBERS
 public:
@@ -189,6 +193,10 @@ private:
     // Кэш текущего состояния "внимания", чтобы не слать сигналы лишний раз
     QTimer m_congestionCheckTimer;
     QMap<int, bool> m_currentAttentionState;
+    
+    // Менеджер ДТП
+    AccidentManager* m_accidentManager;
+    
 signals:
     void osmLoadingFinished();
     void trafficLightStatusChanged(int tlId, bool requiresAttention);

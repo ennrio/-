@@ -23,10 +23,9 @@ void SimulationManager::setSimulationView(SimulationView* view)
 {
     m_simulationView = view;
     
-    // Инициализируем менеджер ДТП при установке view
-    if (view && !m_accidentManager) {
-        m_accidentManager = new AccidentManager();
-        m_accidentManager->setSimulationView(view);
+    // Менеджер ДТП теперь инициализируется в самом SimulationView
+    if (view) {
+        m_accidentManager = view->accidentManager();
     }
 }
 
