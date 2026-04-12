@@ -80,6 +80,13 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
 
     m_accidentCheck = new QCheckBox("Имитировать ДТП");
     m_accidentCheck->setStyleSheet("color: #0077CC;");
+    connect(m_accidentCheck, &QCheckBox::toggled, this, [this](bool checked) {
+        if (checked) {
+            onStartAccidentSimulation();
+        } else {
+            onStopAccidentSimulation();
+        }
+    });
     eventsLayout->addWidget(m_accidentCheck);
 
     m_repairCheck = new QCheckBox("Имитировать ремонтные работы");
@@ -96,21 +103,27 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
 
     m_frequencyCombo = new QComboBox;
     m_frequencyCombo->addItems({"Редко (1 событие в час)", "Средне (2-3 события в час)", "Часто (4+ событий в час)"});
+    connect(m_frequencyCombo, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
+            this, &DataGeneratorWidget::onProbabilityChanged);
     eventsLayout->addWidget(m_frequencyCombo);
+    
+    // Вероятность возникновения ДТП
+    QLabel *probabilityLabel = new QLabel("Вероятность ДТП:");
+    probabilityLabel->setStyleSheet("color: #FFFFFF;");
+    eventsLayout->addWidget(probabilityLabel);
+    
+    m_probabilityCombo = new QComboBox;
+    m_probabilityCombo->addItems({"0%", "5%", "10%", "15%", "20%", "25%", "30%"});
+    connect(m_probabilityCombo, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
+            this, &DataGeneratorWidget::onProbabilityChanged);
+    eventsLayout->addWidget(m_probabilityCombo);
+    
+    // Статус количества активных ДТП
+    m_accidentCountLabel = new QLabel("Активных ДТП: 0");
+    m_accidentCountLabel->setStyleSheet("color: #CC0000; font-weight: bold; font-size: 13px;");
+    eventsLayout->addWidget(m_accidentCountLabel);
 
     settingsLayout->addWidget(eventsGroupBox);
-
-    // Источники данных
-    QGroupBox *sourcesGroupBox = new QGroupBox("Источники данных");
-    sourcesGroupBox->setStyleSheet("QGroupBox { border: 1px solid #404040; border-radius: 4px; }");
-    QVBoxLayout *sourcesLayout = new QVBoxLayout(sourcesGroupBox);
-
-    sourcesLayout->addWidget(new QLabel("Камеры видеонаблюдения 42 устройства (имитация)"));
-    sourcesLayout->addWidget(new QLabel("Датчики движения 18 устройств (имитация)"));
-    sourcesLayout->addWidget(new QLabel("GPS-трекеры транспорта Отключено (имитация)"));
-    sourcesLayout->addWidget(new QLabel("Метеостанция Активна (имитация)"));
-
-    settingsLayout->addWidget(sourcesGroupBox);
 
     // Кнопки управления
     QHBoxLayout *btnLayout = new QHBoxLayout;
@@ -149,10 +162,24 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
         "} "
         "QPushButton:hover { background-color: #0066BB; }"
     );
+    
+    m_createAccidentBtn = new QPushButton("Создать ДТП вручную");
+    m_createAccidentBtn->setStyleSheet(
+        "QPushButton { "
+        "   background-color: #CC0000; "
+        "   color: white; "
+        "   border-radius: 4px; "
+        "   padding: 8px 16px; "
+        "   font-weight: bold; "
+        "} "
+        "QPushButton:hover { background-color: #AA0000; }"
+    );
+    connect(m_createAccidentBtn, &QPushButton::clicked, this, &DataGeneratorWidget::onCreateAccident);
 
     btnLayout->addWidget(m_startBtn);
     btnLayout->addWidget(m_stopBtn);
     btnLayout->addWidget(m_generateBtn);
+    btnLayout->addWidget(m_createAccidentBtn);
 
 
     settingsLayout->addLayout(btnLayout);
@@ -167,5 +194,54 @@ void DataGeneratorWidget::stopGeneration()
     SimulationView* view = SimulationManager::instance().simulationView();
     if (view) {
         view->stopSimulation();
+    }
+}
+
+void DataGeneratorWidget::onStartAccidentSimulation()
+{
+    auto& manager = SimulationManager::instance();
+    if (manager.accidentManager()) {
+        manager.accidentManager()->setAccidentsEnabled(true);
+        
+        // Устанавливаем вероятность из комбобокса
+        QString probText = m_probabilityCombo->currentText();
+        onProbabilityChanged(probText);
+        
+        qDebug() << "Accident simulation started";
+    }
+}
+
+void DataGeneratorWidget::onStopAccidentSimulation()
+{
+    auto& manager = SimulationManager::instance();
+    if (manager.accidentManager()) {
+        manager.accidentManager()->setAccidentsEnabled(false);
+        qDebug() << "Accident simulation stopped";
+    }
+}
+
+void DataGeneratorWidget::onCreateAccident()
+{
+    auto& manager = SimulationManager::instance();
+    SimulationView* view = manager.simulationView();
+    
+    if (view && manager.accidentManager()) {
+        // Создаём ДТП в случайном месте
+        manager.createAccident(QPointF(), -1, "Среднее");
+        qDebug() << "Manual accident created";
+    }
+}
+
+void DataGeneratorWidget::onProbabilityChanged(const QString &text)
+{
+    auto& manager = SimulationManager::instance();
+    if (manager.accidentManager()) {
+        // Парсим текст вероятности (например, "10%" -> 0.1)
+        double probability = 0.0;
+        if (text.contains("%")) {
+            probability = text.remove("%").toDouble() / 100.0;
+        }
+        manager.accidentManager()->setAccidentProbability(probability);
+        qDebug() << "Accident probability set to:" << probability;
     }
 }

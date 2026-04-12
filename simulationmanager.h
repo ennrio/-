@@ -3,6 +3,7 @@
 
 #include "visualization/simulationview.h"
 #include <QMap>
+#include "accidentmanager.h"
 
 class SimulationManager
 {
@@ -37,12 +38,19 @@ public:
 
     // Установить лимит машин
     void setMaxVehicleLimit(int limit);
+    
+    // === Методы управления ДТП ===
+    AccidentManager* accidentManager() const;
+    void createAccident(const QPointF &position, long long nodeId, const QString &severity = "Среднее");
+    void resolveAccident(int accidentId);
+    int getActiveAccidentsCount() const;
 
 private:
     explicit SimulationManager() = default;
     ~SimulationManager() = default;
 
     SimulationView* m_simulationView = nullptr;
+    AccidentManager* m_accidentManager = nullptr;
 };
 
 #endif // SIMULATIONMANAGER_H
