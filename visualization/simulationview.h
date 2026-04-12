@@ -94,6 +94,10 @@ public:
     
     // Получить менеджер ДТП
     AccidentManager* accidentManager() const { return m_accidentManager; }
+    
+    // Неправильная парковка
+    void setWrongParkingEnabled(bool enabled);
+    void setWrongParkingProbability(double probability);
 
 //MEMBERS
 public:
@@ -196,6 +200,11 @@ private:
     
     // Менеджер ДТП
     AccidentManager* m_accidentManager;
+    
+    // Неправильная парковка
+    bool m_wrongParkingEnabled{false};
+    double m_wrongParkingProbability{0.0};
+    QList<int> m_wrongParkedVehicles;  // ID неправильно припаркованных машин
     
 signals:
     void osmLoadingFinished();

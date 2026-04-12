@@ -82,20 +82,16 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     // Параметры генерации
     QGroupBox *paramsGroupBox = new QGroupBox("Параметры генерации");
     paramsGroupBox->setStyleSheet("QGroupBox { border: 1px solid #404040; border-radius: 4px; }");
-    QGridLayout *paramsLayout = new QGridLayout(paramsGroupBox);
+    QVBoxLayout *paramsLayout = new QVBoxLayout(paramsGroupBox);
 
-    paramsLayout->addWidget(new QLabel("Интенсивность трафика:"), 0, 0);
+    paramsLayout->addWidget(new QLabel("Интенсивность трафика:"));
     m_intensityCombo = new QComboBox;
     m_intensityCombo->addItems({"Низкая (до 500 авт/ч)", "Средняя (500-1500 авт/ч)", "Высокая (1500-3000 авт/ч)", "Очень высокая (3000+ авт/ч)"});
-    paramsLayout->addWidget(m_intensityCombo, 0, 1);
-
-    paramsLayout->addWidget(new QLabel("Интервал обновления данных (сек):"), 1, 0);
-    m_intervalInput = new QLineEdit("30");
-    paramsLayout->addWidget(m_intervalInput, 1, 1);
+    paramsLayout->addWidget(m_intensityCombo);
 
     settingsLayout->addWidget(paramsGroupBox);
 
-    // Особые события - только ДТП
+    // Особые события - только ДТП и неправильная парковка
     QGroupBox *eventsGroupBox = new QGroupBox("Особые события");
     eventsGroupBox->setStyleSheet("QGroupBox { border: 1px solid #404040; border-radius: 4px; }");
     QVBoxLayout *eventsLayout = new QVBoxLayout(eventsGroupBox);
@@ -115,6 +111,23 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     connect(m_probabilityCombo, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
             this, &DataGeneratorWidget::onProbabilityChanged);
     eventsLayout->addWidget(m_probabilityCombo);
+    
+    // Неправильная парковка
+    m_parkingCheck = new QCheckBox("Имитировать неправильную парковку");
+    m_parkingCheck->setStyleSheet("color: #0077CC;");
+    connect(m_parkingCheck, &QCheckBox::toggled, this, &DataGeneratorWidget::onParkingToggled);
+    eventsLayout->addWidget(m_parkingCheck);
+    
+    // Вероятность неправильной парковки
+    QLabel *parkingProbabilityLabel = new QLabel("Вероятность неправильной парковки:");
+    parkingProbabilityLabel->setStyleSheet("color: #FFFFFF;");
+    eventsLayout->addWidget(parkingProbabilityLabel);
+    
+    m_parkingProbabilityCombo = new QComboBox;
+    m_parkingProbabilityCombo->addItems({"0%", "5%", "10%", "15%", "20%", "25%", "30%"});
+    connect(m_parkingProbabilityCombo, QOverload<const QString &>::of(&QComboBox::currentTextChanged),
+            this, &DataGeneratorWidget::onParkingProbabilityChanged);
+    eventsLayout->addWidget(m_parkingProbabilityCombo);
     
     // Статус количества активных ДТП
     m_accidentCountLabel = new QLabel("Активных ДТП: 0");
@@ -251,6 +264,34 @@ void DataGeneratorWidget::onProbabilityChanged(const QString &text)
     }
 }
 
+void DataGeneratorWidget::onParkingToggled(bool checked)
+{
+    auto& manager = SimulationManager::instance();
+    if (manager.simulationView()) {
+        manager.simulationView()->setWrongParkingEnabled(checked);
+        
+        // Устанавливаем вероятность из комбобокса
+        QString probText = m_parkingProbabilityCombo->currentText();
+        onParkingProbabilityChanged(probText);
+        
+        qDebug() << "Wrong parking simulation" << (checked ? "started" : "stopped");
+    }
+}
+
+void DataGeneratorWidget::onParkingProbabilityChanged(const QString &text)
+{
+    auto& manager = SimulationManager::instance();
+    if (manager.simulationView()) {
+        // Парсим текст вероятности (например, "10%" -> 0.1)
+        double probability = 0.0;
+        if (text.contains("%")) {
+            probability = text.remove("%").toDouble() / 100.0;
+        }
+        manager.simulationView()->setWrongParkingProbability(probability);
+        qDebug() << "Wrong parking probability set to:" << probability;
+    }
+}
+
 void DataGeneratorWidget::onSaveProfile()
 {
     QString fileName = QFileDialog::getSaveFileName(this, "Сохранить профиль", 
@@ -259,9 +300,10 @@ void DataGeneratorWidget::onSaveProfile()
     
     QJsonObject profile;
     profile["intensity"] = m_intensityCombo->currentIndex();
-    profile["interval"] = m_intervalInput->text().toInt();
     profile["accidents_enabled"] = m_accidentCheck->isChecked();
     profile["accident_probability"] = m_probabilityCombo->currentIndex();
+    profile["parking_enabled"] = m_parkingCheck->isChecked();
+    profile["parking_probability"] = m_parkingProbabilityCombo->currentIndex();
     
     QJsonDocument doc(profile);
     QFile file(fileName);
@@ -289,14 +331,17 @@ void DataGeneratorWidget::onLoadProfile()
         if (profile.contains("intensity")) {
             m_intensityCombo->setCurrentIndex(profile["intensity"].toInt());
         }
-        if (profile.contains("interval")) {
-            m_intervalInput->setText(QString::number(profile["interval"].toInt()));
-        }
         if (profile.contains("accidents_enabled")) {
             m_accidentCheck->setChecked(profile["accidents_enabled"].toBool());
         }
         if (profile.contains("accident_probability")) {
             m_probabilityCombo->setCurrentIndex(profile["accident_probability"].toInt());
+        }
+        if (profile.contains("parking_enabled")) {
+            m_parkingCheck->setChecked(profile["parking_enabled"].toBool());
+        }
+        if (profile.contains("parking_probability")) {
+            m_parkingProbabilityCombo->setCurrentIndex(profile["parking_probability"].toInt());
         }
         
         qDebug() << "Profile loaded from:" << fileName;
