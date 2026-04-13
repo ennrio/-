@@ -1651,6 +1651,36 @@ void SimulationView::resetSimulation()
     qDeleteAll(m_vehicleItems);
     m_vehicleItems.clear();
     
+    // === Очистка светофоров ===
+    // Сначала отключаем все сигналы, чтобы избежать краша при удалении
+    for (auto* tl : m_trafficLights) {
+        if (tl) {
+            disconnect(tl, nullptr, this, nullptr);
+        }
+    }
+    
+    // Удаляем графические элементы светофоров
+    for (auto* item : m_trafficLightItems) {
+        if (item) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    m_trafficLightItems.clear();
+    
+    // Удаляем контроллеры светофоров
+    qDeleteAll(m_controllers);
+    m_controllers.clear();
+    
+    // Удаляем объекты светофоров
+    qDeleteAll(m_trafficLights);
+    m_trafficLights.clear();
+    
+    // Очищаем маппинг OSM ID
+    m_trafficLightOsmId.clear();
+    m_nodesWithTrafficLights.clear();
+    m_currentAttentionState.clear();
+    
     // Сбрасываем счетчики
     m_vehicleCounter = 0;
     
