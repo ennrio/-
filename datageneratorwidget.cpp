@@ -14,8 +14,12 @@
 DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     : QWidget(parent)
     , m_isGenerating(false)
+    , view(nullptr)
 {
     setStyleSheet("background-color: #2B2B2B; color: #FFFFFF;");
+
+    // Инициализируем указатель на SimulationView
+    view = SimulationManager::instance().simulationView();
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(15, 15, 15, 15);
@@ -202,6 +206,11 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
 void DataGeneratorWidget::updateStatus(bool isGenerating, int activeAccidents)
 {
     m_isGenerating = isGenerating;
+    
+    // Обновляем указатель на SimulationView при каждом вызове
+    if (!view) {
+        view = SimulationManager::instance().simulationView();
+    }
     
     if (isGenerating) {
         m_statusLabel->setText("Генерация активна");

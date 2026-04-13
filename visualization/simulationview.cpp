@@ -388,11 +388,13 @@ void SimulationView::updateSimulation()
                 }
                 
                 if (isWrongParked) {
-                    // Неправильная парковка - синий маркер (обводка)
+                    // Неправильная парковка - синий маркер с обводкой
                     item->setColor(Qt::blue);
+                    item->setPenWidth(2);  // Устанавливаем обводку
                 } else {
-                    // Правильная парковка - обычный цвет
-                    item->setColor(QColor(128, 0, 128));
+                    // Правильная парковка (машина просто остановилась) - синий круг без обводки
+                    item->setColor(QColor(100, 149, 237));  // CornflowerBlue - светлый синий
+                    item->setPenWidth(1);  // Тонкая обводка
                 }
 
                 if (currentMsecs - vehicle->finishedTimestamp() > VEHICLE_HIDE_TIMEOUT_MS) {
@@ -402,7 +404,9 @@ void SimulationView::updateSimulation()
                     item->setPos(vehicle->position());
                 }
             } else {
-                item->setColor(QColor(128, 0, 128));
+                // Машина в движении - обычный цвет (не фиолетовый)
+                item->setColor(QColor(200, 100, 100));  // Красноватый оттенок
+                item->setPenWidth(1);
                 item->show();
                 item->setPos(vehicle->position());
             }
