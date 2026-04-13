@@ -26,6 +26,12 @@ void VehicleItem::setColor(const QColor &color)
     update();
 }
 
+void VehicleItem::setPenWidth(int width)
+{
+    m_pen.setWidth(width);
+    update();
+}
+
 void VehicleItem::updatePosition()
 {
     QPointF pos = m_vehicle->position();

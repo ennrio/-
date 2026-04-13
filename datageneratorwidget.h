@@ -9,6 +9,7 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QTimer>
+#include "visualization/simulationview.h"
 
 class DataGeneratorWidget : public QWidget
 {
@@ -45,6 +46,7 @@ private:
     QTimer *m_updateTimer;
     
     bool m_isGenerating;
+    SimulationView* view;
 };
 
 #endif // DATAGENERATORWIDGET_H

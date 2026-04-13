@@ -15,6 +15,7 @@ public:
 
     Vehicle* vehicle() const { return m_vehicle; }
     void setColor(const QColor& color);
+    void setPenWidth(int width);
 
     // QGraphicsItem override
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
