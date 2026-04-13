@@ -41,6 +41,7 @@ private:
     QPushButton *m_saveProfileBtn, *m_loadProfileBtn;
     QLabel *m_statusLabel;
     QLabel *m_accidentCountLabel;      // Метка количества активных ДТП
+    QLabel *m_parkingCountLabel;       // Метка количества неправильных парковок
     QTimer *m_updateTimer;
     
     bool m_isGenerating;

@@ -129,10 +129,14 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
             this, &DataGeneratorWidget::onParkingProbabilityChanged);
     eventsLayout->addWidget(m_parkingProbabilityCombo);
     
-    // Статус количества активных ДТП
+    // Статус количества активных ДТП и неправильных парковок
     m_accidentCountLabel = new QLabel("Активных ДТП: 0");
     m_accidentCountLabel->setStyleSheet("color: #CC0000; font-weight: bold; font-size: 13px;");
     eventsLayout->addWidget(m_accidentCountLabel);
+    
+    m_parkingCountLabel = new QLabel("Неправильных парковок: 0");
+    m_parkingCountLabel->setStyleSheet("color: #0077CC; font-weight: bold; font-size: 13px;");
+    eventsLayout->addWidget(m_parkingCountLabel);
 
     settingsLayout->addWidget(eventsGroupBox);
 
@@ -228,6 +232,13 @@ void DataGeneratorWidget::updateStatus(bool isGenerating, int activeAccidents)
     }
     
     m_accidentCountLabel->setText(QString("Активных ДТП: %1").arg(activeAccidents));
+    
+    // Обновляем количество неправильных парковок
+    int parkingCount = 0;
+    if (view) {
+        parkingCount = view->getWrongParkingCount();
+    }
+    m_parkingCountLabel->setText(QString("Неправильных парковок: %1").arg(parkingCount));
 }
 
 void DataGeneratorWidget::startGeneration()
@@ -257,16 +268,28 @@ void DataGeneratorWidget::restartGeneration()
 {
     SimulationView* view = SimulationManager::instance().simulationView();
     if (view) {
-        // Останавливаем и сразу запускаем заново
+        // Останавливаем симуляцию
         view->stopSimulation();
-        view->startSimulation();
-        updateStatus(true, SimulationManager::instance().getActiveAccidentsCount());
         
-        // Если включена имитация ДТП - перезапускаем её
-        if (m_accidentCheck->isChecked()) {
-            onAccidentToggled(true);
-        }
-        qDebug() << "Generation restarted";
+        // Сбрасываем список неправильных парковок при перезапуске
+        // Это нужно, чтобы старые машины не влияли на новую генерацию
+        
+        // Небольшая задержка перед перезапуском для корректной остановки таймеров
+        QTimer::singleShot(100, this, [this, view]() {
+            view->startSimulation();
+            updateStatus(true, SimulationManager::instance().getActiveAccidentsCount());
+            
+            // Если включена имитация ДТП - перезапускаем её
+            if (m_accidentCheck->isChecked()) {
+                onAccidentToggled(true);
+            }
+            
+            // Если включена имитация неправильной парковки - перезапускаем её
+            if (m_parkingCheck->isChecked()) {
+                onParkingToggled(true);
+            }
+            qDebug() << "Generation restarted";
+        });
     }
 }
 
@@ -388,4 +411,11 @@ void DataGeneratorWidget::updateAccidentCount()
 {
     int count = SimulationManager::instance().getActiveAccidentsCount();
     m_accidentCountLabel->setText(QString("Активных ДТП: %1").arg(count));
+    
+    // Обновляем количество неправильных парковок
+    SimulationView* view = SimulationManager::instance().simulationView();
+    if (view) {
+        int parkingCount = view->getWrongParkingCount();
+        m_parkingCountLabel->setText(QString("Неправильных парковок: %1").arg(parkingCount));
+    }
 }
