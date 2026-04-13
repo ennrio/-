@@ -98,6 +98,10 @@ public:
     // Неправильная парковка
     void setWrongParkingEnabled(bool enabled);
     void setWrongParkingProbability(double probability);
+    
+    // Обновление маркеров ДТП
+    void updateAccidentMarkers();
+    void updateWrongParkingMarkers();
 
 //MEMBERS
 public:

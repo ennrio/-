@@ -21,6 +21,7 @@ public:
 private slots:
     void startGeneration();
     void stopGeneration();
+    void restartGeneration();
     void onAccidentToggled(bool checked);
     void onProbabilityChanged(const QString &text);
     void onParkingToggled(bool checked);
@@ -36,7 +37,7 @@ private:
     QComboBox *m_probabilityCombo;  // Вероятность ДТП
     QCheckBox *m_parkingCheck;      // Неправильная парковка
     QComboBox *m_parkingProbabilityCombo;  // Вероятность неправильной парковки
-    QPushButton *m_startBtn, *m_stopBtn;
+    QPushButton *m_startBtn, *m_stopBtn, *m_restartBtn;
     QPushButton *m_saveProfileBtn, *m_loadProfileBtn;
     QLabel *m_statusLabel;
     QLabel *m_accidentCountLabel;      // Метка количества активных ДТП
