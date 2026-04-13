@@ -277,11 +277,8 @@ void DataGeneratorWidget::restartGeneration()
 {
     SimulationView* view = SimulationManager::instance().simulationView();
     if (view) {
-        // Останавливаем симуляцию
-        view->stopSimulation();
-        
-        // Сбрасываем список неправильных парковок при перезапуске
-        // Это нужно, чтобы старые машины не влияли на новую генерацию
+        // Полностью сбрасываем симуляцию - очищаем все данные
+        view->resetSimulation();
         
         // Небольшая задержка перед перезапуском для корректной остановки таймеров
         QTimer::singleShot(100, this, [this, view]() {
@@ -297,7 +294,7 @@ void DataGeneratorWidget::restartGeneration()
             if (m_parkingCheck->isChecked()) {
                 onParkingToggled(true);
             }
-            qDebug() << "Generation restarted";
+            qDebug() << "Generation restarted - simulation reset complete";
         });
     }
 }

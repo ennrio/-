@@ -105,6 +105,9 @@ public:
     // Обновление маркеров ДТП
     void updateAccidentMarkers();
     void updateWrongParkingMarkers();
+    
+    // Сброс симуляции (очистка всех данных)
+    void resetSimulation();
 
 //MEMBERS
 public:
