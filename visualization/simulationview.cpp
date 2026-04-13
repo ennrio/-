@@ -388,11 +388,11 @@ void SimulationView::updateSimulation()
                 }
                 
                 if (isWrongParked) {
-                    // Неправильная парковка - красный маркер
-                    item->setColor(Qt::red);
-                } else {
-                    // Правильная парковка - синий цвет
+                    // Неправильная парковка - синий маркер (обводка)
                     item->setColor(Qt::blue);
+                } else {
+                    // Правильная парковка - обычный цвет
+                    item->setColor(QColor(128, 0, 128));
                 }
 
                 if (currentMsecs - vehicle->finishedTimestamp() > VEHICLE_HIDE_TIMEOUT_MS) {
@@ -1456,6 +1456,10 @@ bool SimulationView::hasTrafficLightsOnWay(const QList<long long> &nodeRefs) con
 QMap<long long, QPointF> SimulationView::getAllNodePositions() const
 {
     // Возвращаем копию всех позиций узлов для использования в AccidentManager
+    // Используем m_osmNodePositions, который заполняется при загрузке OSM
+    if (m_osmNodePositions.isEmpty()) {
+        qWarning() << "AccidentManager: m_osmNodePositions is empty!";
+    }
     return m_osmNodePositions;
 }
 
@@ -1569,7 +1573,7 @@ void SimulationView::updateWrongParkingMarkers()
             Vehicle* vehicle = m_vehicles[vehicleId];
             
             if (!parkingMarkers.contains(vehicleId)) {
-                // Создаём новый маркер - красный круг меньшего размера
+                // Создаём новый маркер - синий круг меньшего размера (обводка)
                 QGraphicsEllipseItem *marker = new QGraphicsEllipseItem(
                     -8,   // x: -half width
                     -8,   // y: -half height  
@@ -1577,8 +1581,8 @@ void SimulationView::updateWrongParkingMarkers()
                     16    // height: 16 pixels
                 );
                 marker->setPos(vehicle->position());
-                marker->setPen(QPen(Qt::red, 2));
-                marker->setBrush(QColor(255, 0, 0, 100)); // Полупрозрачный красный
+                marker->setPen(QPen(Qt::blue, 2));  // Синяя обводка
+                marker->setBrush(QColor(0, 0, 255, 100)); // Полупрозрачный синий
                 marker->setZValue(11); // Выше машин и ДТП
                 m_scene->addItem(marker);
                 parkingMarkers[vehicleId] = marker;

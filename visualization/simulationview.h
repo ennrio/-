@@ -99,6 +99,9 @@ public:
     void setWrongParkingEnabled(bool enabled);
     void setWrongParkingProbability(double probability);
     
+    // Получить количество неправильных парковок
+    int getWrongParkingCount() const { return m_wrongParkedVehicles.count(); }
+    
     // Обновление маркеров ДТП
     void updateAccidentMarkers();
     void updateWrongParkingMarkers();
