@@ -48,6 +48,9 @@ public:
     QPointF position() const { return m_position; }
     qreal speed() const { return m_speed; }
     int id() const { return m_id; }
+    
+    // Проверка, остановлена ли машина (не на светофоре)
+    bool isStopped() const { return m_speed < 0.1 && m_stoppedAtLightId == -1 && m_routeFinished; }
 
     // Для связи с SimulationView
     using TrafficLightChecker = std::function<LightState(const QPointF&, qreal)>;
