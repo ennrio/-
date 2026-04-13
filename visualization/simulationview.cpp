@@ -1601,3 +1601,59 @@ void SimulationView::updateWrongParkingMarkers()
     }
 }
 
+// ============================================================================
+// Reset Simulation - очистка всех данных симуляции
+// ============================================================================
+void SimulationView::resetSimulation()
+{
+    // Останавливаем все таймеры
+    m_simulationTimer.stop();
+    m_vehicleSpawnTimer.stop();
+    m_congestionCheckTimer.stop();
+    
+    // Очищаем список неправильно припаркованных машин
+    m_wrongParkedVehicles.clear();
+    
+    // Сбрасываем флаг генерации неправильных парковок
+    m_wrongParkingEnabled = false;
+    m_wrongParkingProbability = 0.0;
+    
+    // Очищаем и удаляем все маркеры неправильной парковки со сцены
+    QList<QGraphicsItem*> items = m_scene->items();
+    for (QGraphicsItem* item : items) {
+        // Маркеры неправильной парковки имеют Z-value 11
+        if (item->zValue() == 11) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    
+    // Очищаем и удаляем все маркеры ДТП со сцены (Z-value 10)
+    for (QGraphicsItem* item : m_scene->items()) {
+        if (item->zValue() == 10) {
+            m_scene->removeItem(item);
+            delete item;
+        }
+    }
+    
+    // Очищаем менеджер ДТП
+    if (m_accidentManager) {
+        // Разрешаем все активные ДТП
+        QList<Accident> activeAccidents = m_accidentManager->getActiveAccidents();
+        for (const Accident& accident : activeAccidents) {
+            m_accidentManager->resolveAccident(accident.id);
+        }
+    }
+    
+    // Удаляем все транспортные средства
+    qDeleteAll(m_vehicles);
+    m_vehicles.clear();
+    qDeleteAll(m_vehicleItems);
+    m_vehicleItems.clear();
+    
+    // Сбрасываем счетчики
+    m_vehicleCounter = 0;
+    
+    qDebug() << "Simulation reset complete - all data cleared";
+}
+
