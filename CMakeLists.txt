@@ -28,6 +28,7 @@ qt_add_executable(asudd
     registerdialog.h registerdialog.cpp
     simulationmanager.h simulationmanager.cpp
     constants.h
+    accidentmanager.cpp
 )
 
 target_link_libraries(asudd
