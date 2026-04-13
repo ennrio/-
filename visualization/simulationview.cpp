@@ -208,6 +208,36 @@ void SimulationView::stopSimulation()
     qDebug() << "Simulation stopped";
 }
 
+void SimulationView::resetSimulation()
+{
+    // Останавливаем симуляцию
+    stopSimulation();
+    
+    // Очищаем все автомобили
+    qDeleteAll(m_vehicles);
+    m_vehicles.clear();
+    
+    // Очищаем графические элементы автомобилей
+    for (VehicleItem* item : m_vehicleItems) {
+        m_scene->removeItem(item);
+        delete item;
+    }
+    m_vehicleItems.clear();
+    
+    // Очищаем список неправильно припаркованных машин
+    m_wrongParkedVehicles.clear();
+    
+    // Сбрасываем менеджер ДТП
+    if (m_accidentManager) {
+        m_accidentManager->clearAllAccidents();
+    }
+    
+    // Обновляем сцену
+    m_scene->update();
+    
+    qDebug() << "Simulation reset - all vehicles, accidents and parking markers cleared";
+}
+
 int SimulationView::getActiveVehicleCount() const
 {
     int counter = 0;

@@ -181,6 +181,21 @@ Accident* AccidentManager::getNearestAccident(const QPointF &position, qreal rad
     return nearest;
 }
 
+void AccidentManager::clearAllAccidents()
+{
+    // Очищаем все ДТП
+    m_accidents.clear();
+    
+    // Останавливаем таймер спавна
+    if (m_spawnTimer.isActive()) {
+        m_spawnTimer.stop();
+    }
+    
+    qDebug() << "All accidents cleared";
+    
+    emit accidentsUpdated();
+}
+
 void AccidentManager::checkAccidentSpawn()
 {
     if (!m_accidentsEnabled || !m_simulationView) {

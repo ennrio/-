@@ -60,6 +60,7 @@ public:
 
     void startSimulation();
     void stopSimulation();
+    void resetSimulation();  // Полная очистка симуляции
     int getActiveVehicleCount() const;
     int getVehicleCount() const;
     double getAverageSpeed() const;

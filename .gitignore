@@ -9,9 +9,9 @@
 *.out
 
 # Dependencies
+node_modules/
 venv/
 .venv/
-node_modules/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
@@ -20,20 +20,19 @@ build/
 target/
 .gradle/
 
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
 # Logs and temp files
 *.log
 *.tmp
+*.swp
 
 # Environment
 .env
 .env.local
 *.env.*
+
+# Editors
+.vscode/
+.idea/
 
 # System files
 .DS_Store

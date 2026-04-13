@@ -57,6 +57,9 @@ public:
     
     // Получить ближайшее ДТП к позиции
     Accident* getNearestAccident(const QPointF &position, qreal radius = 100.0);
+    
+    // Очистить все ДТП (для сброса симуляции)
+    void clearAllAccidents();
 
 signals:
     // Сигнал о новом ДТП

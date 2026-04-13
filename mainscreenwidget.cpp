@@ -255,7 +255,9 @@ void MainScreenWidget::updateMainScreen()
     loadCount->setText(QString::number(loading_road) + " %"); //TODO нужно брать значение от истор максимума или от среднеквадратичного отклонения, по хорошему вообще расчитывать для каждой дороги по отдельности
     speedCount->setText(QString::number(m_simulationView->getAverageSpeed()) + " км/ч");
     
-    // Обновляем количество активных инцидентов (ДТП)
+    // Обновляем количество активных инцидентов (ДТП + неправильные парковки)
     int activeAccidents = SimulationManager::instance().getActiveAccidentsCount();
-    m_incidentsCount->setText(QString::number(activeAccidents));
+    int wrongParkingCount = m_simulationView->getWrongParkingCount();
+    int totalIncidents = activeAccidents + wrongParkingCount;
+    m_incidentsCount->setText(QString::number(totalIncidents));
 }
