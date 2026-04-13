@@ -257,5 +257,5 @@ void MainScreenWidget::updateMainScreen()
     
     // Обновляем количество активных инцидентов (ДТП)
     int activeAccidents = SimulationManager::instance().getActiveAccidentsCount();
-    m_incidentsCount->setText(QString::number(activeAccidents));
+    m_incidentsCount->setText(QString::number(activeAccidents+ m_simulationView->getWrongParkingCount()));
 }
