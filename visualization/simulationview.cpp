@@ -1493,21 +1493,22 @@ void SimulationView::updateAccidentMarkers()
     // Создаём или обновляем маркеры для активных ДТП
     for (const Accident &accident : activeAccidents) {
         if (!accidentMarkers.contains(accident.id)) {
-            // Создаём новый маркер - красный круг с полупрозрачной зоной влияния
+            // Создаём новый маркер - маленький красный круг (фиксированный размер 20px)
+            int markerSize = 20; // Фиксированный небольшой размер
             QGraphicsEllipseItem *marker = new QGraphicsEllipseItem(
-                -accident.affectedRadius/2, 
-                -accident.affectedRadius/2,
-                accident.affectedRadius,
-                accident.affectedRadius
+                -markerSize/2, 
+                -markerSize/2,
+                markerSize,
+                markerSize
             );
             marker->setPos(accident.position);
-            marker->setPen(QPen(Qt::red, 3));
-            marker->setBrush(QColor(255, 0, 0, 50)); // Полупрозрачный красный
+            marker->setPen(QPen(Qt::red, 2));
+            marker->setBrush(QColor(255, 0, 0, 150)); // Более непрозрачный красный
             marker->setZValue(10); // Выше машин
             m_scene->addItem(marker);
             accidentMarkers[accident.id] = marker;
             
-            qDebug() << "Accident marker created for ID:" << accident.id;
+            qDebug() << "Accident marker created for ID:" << accident.id << "at" << accident.position;
         } else {
             // Обновляем позицию существующего маркера
             QGraphicsEllipseItem *marker = accidentMarkers[accident.id];
@@ -1541,5 +1542,54 @@ void SimulationView::setWrongParkingProbability(double probability)
 {
     m_wrongParkingProbability = qBound(0.0, probability, 1.0);
     qDebug() << "Wrong parking probability set to:" << m_wrongParkingProbability;
+}
+
+// Маркеры неправильной парковки
+void SimulationView::updateWrongParkingMarkers()
+{
+    // Статический кэш маркеров неправильной парковки
+    static QMap<int, QGraphicsEllipseItem*> parkingMarkers;
+    
+    // Удаляем маркеры для машин, которые больше не припаркованы неправильно
+    QList<int> toRemove;
+    for (auto it = parkingMarkers.begin(); it != parkingMarkers.end(); ++it) {
+        if (!m_wrongParkedVehicles.contains(it.key())) {
+            m_scene->removeItem(it.value());
+            delete it.value();
+            toRemove.append(it.key());
+        }
+    }
+    for (int id : toRemove) {
+        parkingMarkers.remove(id);
+    }
+    
+    // Создаём или обновляем маркеры для неправильно припаркованных машин
+    for (int vehicleId : m_wrongParkedVehicles) {
+        if (m_vehicles.contains(vehicleId)) {
+            Vehicle* vehicle = m_vehicles[vehicleId];
+            
+            if (!parkingMarkers.contains(vehicleId)) {
+                // Создаём новый маркер - красный круг меньшего размера
+                QGraphicsEllipseItem *marker = new QGraphicsEllipseItem(
+                    -8,   // x: -half width
+                    -8,   // y: -half height  
+                    16,   // width: 16 pixels
+                    16    // height: 16 pixels
+                );
+                marker->setPos(vehicle->position());
+                marker->setPen(QPen(Qt::red, 2));
+                marker->setBrush(QColor(255, 0, 0, 100)); // Полупрозрачный красный
+                marker->setZValue(11); // Выше машин и ДТП
+                m_scene->addItem(marker);
+                parkingMarkers[vehicleId] = marker;
+                
+                qDebug() << "Wrong parking marker created for vehicle:" << vehicleId;
+            } else {
+                // Обновляем позицию существующего маркера
+                QGraphicsEllipseItem *marker = parkingMarkers[vehicleId];
+                marker->setPos(vehicle->position());
+            }
+        }
+    }
 }
 

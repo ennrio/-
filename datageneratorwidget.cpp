@@ -166,8 +166,24 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     connect(m_stopBtn, &QPushButton::clicked, this, &DataGeneratorWidget::stopGeneration);
     m_stopBtn->setEnabled(false);
 
+    m_restartBtn = new QPushButton("Перезапустить генерацию");
+    m_restartBtn->setStyleSheet(
+        "QPushButton { "
+        "   background-color: #FF8800; "
+        "   color: white; "
+        "   border-radius: 4px; "
+        "   padding: 8px 16px; "
+        "   font-weight: bold; "
+        "} "
+        "QPushButton:hover { background-color: #EE7700; }"
+        "QPushButton:disabled { background-color: #555555; color: #888888; }"
+    );
+    connect(m_restartBtn, &QPushButton::clicked, this, &DataGeneratorWidget::restartGeneration);
+    m_restartBtn->setEnabled(false);
+
     btnLayout->addWidget(m_startBtn);
     btnLayout->addWidget(m_stopBtn);
+    btnLayout->addWidget(m_restartBtn);
 
     settingsLayout->addLayout(btnLayout);
     settingsGroupBox->setLayout(settingsLayout);
@@ -195,6 +211,7 @@ void DataGeneratorWidget::updateStatus(bool isGenerating, int activeAccidents)
         );
         m_startBtn->setEnabled(false);
         m_stopBtn->setEnabled(true);
+        m_restartBtn->setEnabled(true);
     } else {
         m_statusLabel->setText("Генерация приостановлена");
         m_statusLabel->setStyleSheet(
@@ -207,6 +224,7 @@ void DataGeneratorWidget::updateStatus(bool isGenerating, int activeAccidents)
         );
         m_startBtn->setEnabled(true);
         m_stopBtn->setEnabled(false);
+        m_restartBtn->setEnabled(false);
     }
     
     m_accidentCountLabel->setText(QString("Активных ДТП: %1").arg(activeAccidents));
@@ -235,6 +253,23 @@ void DataGeneratorWidget::stopGeneration()
     }
 }
 
+void DataGeneratorWidget::restartGeneration()
+{
+    SimulationView* view = SimulationManager::instance().simulationView();
+    if (view) {
+        // Останавливаем и сразу запускаем заново
+        view->stopSimulation();
+        view->startSimulation();
+        updateStatus(true, SimulationManager::instance().getActiveAccidentsCount());
+        
+        // Если включена имитация ДТП - перезапускаем её
+        if (m_accidentCheck->isChecked()) {
+            onAccidentToggled(true);
+        }
+        qDebug() << "Generation restarted";
+    }
+}
+
 void DataGeneratorWidget::onAccidentToggled(bool checked)
 {
     auto& manager = SimulationManager::instance();
@@ -255,8 +290,9 @@ void DataGeneratorWidget::onProbabilityChanged(const QString &text)
     if (manager.accidentManager()) {
         // Парсим текст вероятности (например, "10%" -> 0.1)
         double probability = 0.0;
-        if (text.contains("%")) {
-            probability = text.remove("%").toDouble() / 100.0;
+        auto a = text;
+        if (a.contains("%")) {
+            probability = a.remove("%").toDouble() / 100.0;
         }
         manager.accidentManager()->setAccidentProbability(probability);
         qDebug() << "Accident probability set to:" << probability;
@@ -283,8 +319,9 @@ void DataGeneratorWidget::onParkingProbabilityChanged(const QString &text)
     if (manager.simulationView()) {
         // Парсим текст вероятности (например, "10%" -> 0.1)
         double probability = 0.0;
-        if (text.contains("%")) {
-            probability = text.remove("%").toDouble() / 100.0;
+        auto a = text;
+        if (a.contains("%")) {
+            probability = a.remove("%").toDouble() / 100.0;
         }
         manager.simulationView()->setWrongParkingProbability(probability);
         qDebug() << "Wrong parking probability set to:" << probability;
