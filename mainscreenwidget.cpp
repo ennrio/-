@@ -258,12 +258,12 @@ void MainScreenWidget::onExportLogsClicked()
 {
     logAction("Экспорт логов");
     // Здесь будет логика экспорта логов
-    Logger::instance().logSystemEvent("Экспорт логов запрошен");
+    Logger::instance().logUserAction("Экспорт логов запрошен");
 }
 
 void MainScreenWidget::onDiagnosticClicked()
 {
     logAction("Диагностика системы");
     // Здесь будет логика диагностики системы
-    Logger::instance().logSystemEvent("Диагностика системы запрошена");
+    Logger::instance().logUserAction("Диагностика системы запрошена");
 }

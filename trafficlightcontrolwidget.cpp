@@ -219,19 +219,19 @@ void TrafficLightControlWidget::onModeChanged(const QString &modeText)
         newText = "Автоматический режим";
         colorCode = "#00AA00";
         if(sv) sv->setLightMode(LightMode::autoMode);
-        Logger::instance().logSystemEvent("Светофоры: Автоматический режим активирован");
+        Logger::instance().logUserAction("Светофоры: Автоматический режим активирован");
     }
     else if (isManual) {
         newText = "Ручное управление";
         colorCode = "#FFAA00";
         if(sv) sv->setLightMode(LightMode::manualMode);
-        Logger::instance().logSystemEvent("Светофоры: Ручной режим активирован");
+        Logger::instance().logUserAction("Светофоры: Ручной режим активирован");
     }
     else if (isNight) {
         newText = "Ночной режим";
         colorCode = "#00AAFF";
         if(sv) sv->setLightMode(LightMode::nightMode);
-        Logger::instance().logSystemEvent("Светофоры: Ночной режим активирован");
+        Logger::instance().logUserAction("Светофоры: Ночной режим активирован");
     }
 
     statusLabel->setText(newText);
@@ -325,7 +325,7 @@ void TrafficLightControlWidget::onApplyClicked()
     qDebug() << "[APPLY] Applied to" << targetTls.size() << "traffic light(s)"
              << "G:" << green << "s Y:" << yellow << "s R:" << red;
     
-    Logger::instance().logSystemEvent(
+    Logger::instance().logUserAction(
         QString("Светофоры: Применены настройки для %1 объектов (Зелёный: %2с, Жёлтый: %3с, Красный: %4с)")
             .arg(targetTls.size()).arg(green).arg(yellow).arg(red));
 }
@@ -359,7 +359,7 @@ void TrafficLightControlWidget::onResetClicked()
 
     qDebug() << "[RESET] Reset" << targetTls.size() << "traffic light(s) to default";
     
-    Logger::instance().logSystemEvent(
+    Logger::instance().logUserAction(
         QString("Светофоры: Сброшены настройки для %1 объектов").arg(targetTls.size()));
 }
 
