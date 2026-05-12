@@ -178,12 +178,12 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
 
 void MainScreenWidget::logAction(const QString &actionName)
 {
-    Logger::instance().logUserAction("MainScreenWidget_" + actionName);
+    Logger::instance().logUserAction("MainScreenWidget: " + actionName);
 }
 
 void MainScreenWidget::onStartNewShift()
 {
-    logAction("StartNewShift");
+    logAction("Начать новую смену");
     RegisterDialog dialog(this,is_first);
 
     if (dialog.exec() == QDialog::Accepted) {
@@ -256,14 +256,14 @@ void MainScreenWidget::updateMainScreen()
 
 void MainScreenWidget::onExportLogsClicked()
 {
-    logAction("ExportLogs");
+    logAction("Экспорт логов");
     // Здесь будет логика экспорта логов
-    Logger::instance().logSystemEvent("Export logs requested");
+    Logger::instance().logSystemEvent("Экспорт логов запрошен");
 }
 
 void MainScreenWidget::onDiagnosticClicked()
 {
-    logAction("Diagnostic");
+    logAction("Диагностика системы");
     // Здесь будет логика диагностики системы
-    Logger::instance().logSystemEvent("System diagnostic requested");
+    Logger::instance().logSystemEvent("Диагностика системы запрошена");
 }

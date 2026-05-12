@@ -193,7 +193,7 @@ void TrafficLightControlWidget::syncWithSimulation()
 
 void TrafficLightControlWidget::onModeChanged(const QString &modeText)
 {
-    logAction("ModeChange_" + modeText);
+    logAction(modeText);
     
     QString newText;
     QString colorCode;
@@ -219,19 +219,19 @@ void TrafficLightControlWidget::onModeChanged(const QString &modeText)
         newText = "Автоматический режим";
         colorCode = "#00AA00";
         if(sv) sv->setLightMode(LightMode::autoMode);
-        Logger::instance().logSystemEvent("TrafficLight_AutoMode_activated");
+        Logger::instance().logSystemEvent("Светофоры: Автоматический режим активирован");
     }
     else if (isManual) {
         newText = "Ручное управление";
         colorCode = "#FFAA00";
         if(sv) sv->setLightMode(LightMode::manualMode);
-        Logger::instance().logSystemEvent("TrafficLight_ManualMode_activated");
+        Logger::instance().logSystemEvent("Светофоры: Ручной режим активирован");
     }
     else if (isNight) {
         newText = "Ночной режим";
         colorCode = "#00AAFF";
         if(sv) sv->setLightMode(LightMode::nightMode);
-        Logger::instance().logSystemEvent("TrafficLight_NightMode_activated");
+        Logger::instance().logSystemEvent("Светофоры: Ночной режим активирован");
     }
 
     statusLabel->setText(newText);
@@ -265,7 +265,7 @@ void TrafficLightControlWidget::onCrossingSelected()
         m_applyButton->setEnabled(true);
         m_resetButton->setEnabled(true);
         
-        logAction("CrossingSelected_" + m_crossingsMap[id].name);
+        logAction("Выбран перекрёсток: " + m_crossingsMap[id].name);
     }
 }
 
@@ -291,7 +291,7 @@ void TrafficLightControlWidget::updateCrossingStatus(long long tlId, bool requir
 
 void TrafficLightControlWidget::onApplyClicked()
 {
-    logAction("ApplyClicked");
+    logAction("Применить изменения");
     
     if (!sv) {
         QMessageBox::warning(this, "Ошибка", "SimulationView не найден");
@@ -326,13 +326,13 @@ void TrafficLightControlWidget::onApplyClicked()
              << "G:" << green << "s Y:" << yellow << "s R:" << red;
     
     Logger::instance().logSystemEvent(
-        QString("TrafficLight_settings_applied_count_%1_G%2_Y%3_R%4")
+        QString("Светофоры: Применены настройки для %1 объектов (Зелёный: %2с, Жёлтый: %3с, Красный: %4с)")
             .arg(targetTls.size()).arg(green).arg(yellow).arg(red));
 }
 
 void TrafficLightControlWidget::onResetClicked()
 {
-    logAction("ResetClicked");
+    logAction("Сбросить");
     
     if (!sv) {
         QMessageBox::warning(this, "Ошибка", "SimulationView не найден");
@@ -360,12 +360,12 @@ void TrafficLightControlWidget::onResetClicked()
     qDebug() << "[RESET] Reset" << targetTls.size() << "traffic light(s) to default";
     
     Logger::instance().logSystemEvent(
-        QString("TrafficLight_settings_reset_count_%1").arg(targetTls.size()));
+        QString("Светофоры: Сброшены настройки для %1 объектов").arg(targetTls.size()));
 }
 
 void TrafficLightControlWidget::onWaySelected()
 {
-    logAction("WaySelected");
+    logAction("Выбрано направление");
     
     // Сбрасываем выбранный светофор
     m_selectedCrossingId = -1;
@@ -646,5 +646,5 @@ QString TrafficLightControlWidget::formatResetMessage(const QList<long long> &tl
 
 void TrafficLightControlWidget::logAction(const QString &actionName)
 {
-    Logger::instance().logUserAction("TrafficLightControlWidget_" + actionName);
+    Logger::instance().logUserAction("TrafficLightControlWidget: " + actionName);
 }

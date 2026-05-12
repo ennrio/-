@@ -175,40 +175,40 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
 
 void AnalyticsWidget::onPeriodApplyClicked()
 {
-    Logger::instance().logUserAction("AnalyticsWidget_PeriodApply_" + m_periodCombo->currentText());
+    Logger::instance().logUserAction("AnalyticsWidget: Применить период - " + m_periodCombo->currentText());
 }
 
 void AnalyticsWidget::onDailyReportClicked()
 {
-    Logger::instance().logUserAction("AnalyticsWidget_DailyReport");
+    Logger::instance().logUserAction("AnalyticsWidget: Отчёт за смену");
 }
 
 void AnalyticsWidget::onWeeklyReportClicked()
 {
-    Logger::instance().logUserAction("AnalyticsWidget_WeeklyReport");
+    Logger::instance().logUserAction("AnalyticsWidget: Отчёт за сутки");
 }
 
 void AnalyticsWidget::onMonthlyReportClicked()
 {
-    Logger::instance().logUserAction("AnalyticsWidget_MonthlyReport");
+    Logger::instance().logUserAction("AnalyticsWidget: Отчёт за неделю");
 }
 
 void AnalyticsWidget::onCustomReportClicked()
 {
-    Logger::instance().logUserAction("AnalyticsWidget_CustomReport");
+    Logger::instance().logUserAction("AnalyticsWidget: Отчёт за месяц");
 }
 
 void AnalyticsWidget::onCompareClicked()
 {
-    Logger::instance().logUserAction("AnalyticsWidget_ComparePeriods");
+    Logger::instance().logUserAction("AnalyticsWidget: Сравнить с прошлым периодом");
 }
 
 void AnalyticsWidget::onExportClicked()
 {
-    Logger::instance().logUserAction("AnalyticsWidget_ExportCSV");
+    Logger::instance().logUserAction("AnalyticsWidget: Экспорт сырых данных (CSV)");
 }
 
 void AnalyticsWidget::onPrintClicked()
 {
-    Logger::instance().logUserAction("AnalyticsWidget_PrintReport");
+    Logger::instance().logUserAction("AnalyticsWidget: Печать отчёта");
 }
