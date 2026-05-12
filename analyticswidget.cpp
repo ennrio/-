@@ -3,6 +3,7 @@
 #include <QHBoxLayout>
 #include <QGridLayout>
 #include <QGroupBox>
+#include "logger.h"
 
 AnalyticsWidget::AnalyticsWidget(QWidget *parent)
     : QWidget(parent)
@@ -44,7 +45,10 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
         "Произвольный период"
     });
     periodLayout->addWidget(m_periodCombo);
-    periodLayout->addWidget(new QPushButton("Применить"));
+    
+    QPushButton *applyPeriodBtn = new QPushButton("Применить");
+    connect(applyPeriodBtn, &QPushButton::clicked, this, &AnalyticsWidget::onPeriodApplyClicked);
+    periodLayout->addWidget(applyPeriodBtn);
     analyticsLayout->addLayout(periodLayout);
 
     // Ключевые показатели
@@ -102,6 +106,7 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
         "} "
         "QPushButton:hover { background-color: #0066BB; }"
         );
+    connect(m_dailyReportBtn, &QPushButton::clicked, this, &AnalyticsWidget::onDailyReportClicked);
 
     m_weeklyReportBtn = new QPushButton("📈 За сутки PDF, Excel");
     m_weeklyReportBtn->setStyleSheet(
@@ -114,6 +119,7 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
         "} "
         "QPushButton:hover { background-color: #0066BB; }"
         );
+    connect(m_weeklyReportBtn, &QPushButton::clicked, this, &AnalyticsWidget::onWeeklyReportClicked);
 
     m_monthlyReportBtn = new QPushButton("📉 За неделю PDF, Excel");
     m_monthlyReportBtn->setStyleSheet(
@@ -126,6 +132,7 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
         "} "
         "QPushButton:hover { background-color: #0066BB; }"
         );
+    connect(m_monthlyReportBtn, &QPushButton::clicked, this, &AnalyticsWidget::onMonthlyReportClicked);
 
     m_customReportBtn = new QPushButton("📋 За месяц PDF, Excel, CSV");
     m_customReportBtn->setStyleSheet(
@@ -138,6 +145,7 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
         "} "
         "QPushButton:hover { background-color: #0066BB; }"
         );
+    connect(m_customReportBtn, &QPushButton::clicked, this, &AnalyticsWidget::onCustomReportClicked);
 
     btnLayout->addWidget(m_dailyReportBtn);
     btnLayout->addWidget(m_weeklyReportBtn);
@@ -147,11 +155,60 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
     reportsLayout->addLayout(btnLayout);
 
     QHBoxLayout *moreBtnLayout = new QHBoxLayout;
-    moreBtnLayout->addWidget(new QPushButton("Сравнить с прошлым периодом"));
-    moreBtnLayout->addWidget(new QPushButton("Экспорт сырых данных (CSV)"));
-    moreBtnLayout->addWidget(new QPushButton("Печать отчёта"));
+    m_compareBtn = new QPushButton("Сравнить с прошлым периодом");
+    connect(m_compareBtn, &QPushButton::clicked, this, &AnalyticsWidget::onCompareClicked);
+    
+    m_exportBtn = new QPushButton("Экспорт сырых данных (CSV)");
+    connect(m_exportBtn, &QPushButton::clicked, this, &AnalyticsWidget::onExportClicked);
+    
+    m_printBtn = new QPushButton("Печать отчёта");
+    connect(m_printBtn, &QPushButton::clicked, this, &AnalyticsWidget::onPrintClicked);
+    
+    moreBtnLayout->addWidget(m_compareBtn);
+    moreBtnLayout->addWidget(m_exportBtn);
+    moreBtnLayout->addWidget(m_printBtn);
 
     reportsLayout->addLayout(moreBtnLayout);
     reportsGroupBox->setLayout(reportsLayout);
     mainLayout->addWidget(reportsGroupBox);
+}
+
+void AnalyticsWidget::onPeriodApplyClicked()
+{
+    Logger::instance().logUserAction("AnalyticsWidget_PeriodApply_" + m_periodCombo->currentText());
+}
+
+void AnalyticsWidget::onDailyReportClicked()
+{
+    Logger::instance().logUserAction("AnalyticsWidget_DailyReport");
+}
+
+void AnalyticsWidget::onWeeklyReportClicked()
+{
+    Logger::instance().logUserAction("AnalyticsWidget_WeeklyReport");
+}
+
+void AnalyticsWidget::onMonthlyReportClicked()
+{
+    Logger::instance().logUserAction("AnalyticsWidget_MonthlyReport");
+}
+
+void AnalyticsWidget::onCustomReportClicked()
+{
+    Logger::instance().logUserAction("AnalyticsWidget_CustomReport");
+}
+
+void AnalyticsWidget::onCompareClicked()
+{
+    Logger::instance().logUserAction("AnalyticsWidget_ComparePeriods");
+}
+
+void AnalyticsWidget::onExportClicked()
+{
+    Logger::instance().logUserAction("AnalyticsWidget_ExportCSV");
+}
+
+void AnalyticsWidget::onPrintClicked()
+{
+    Logger::instance().logUserAction("AnalyticsWidget_PrintReport");
 }

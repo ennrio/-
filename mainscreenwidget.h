@@ -12,6 +12,7 @@
 #include <QTabWidget>
 #include <QTimer>
 #include "visualization/simulationview.h"
+#include "logger.h"
 
 class MainScreenWidget : public QWidget
 {
@@ -19,6 +20,15 @@ class MainScreenWidget : public QWidget
 
 public:
     explicit MainScreenWidget(QWidget *parent = nullptr);
+
+private:
+    void logAction(const QString& actionName);
+
+private slots:
+    void onStartNewShift();
+    void updateMainScreen();
+    void onExportLogsClicked();
+    void onDiagnosticClicked();
 
 private:
     QVBoxLayout *m_mainLayout;
@@ -60,10 +70,6 @@ private:
     int minutes = 0;
     int maxCountVehicle = 0;
     bool *is_first = new bool(true);
-
-private slots:
-    void onStartNewShift();
-    void updateMainScreen();
 };
 
 #endif // MAINSCREENWIDGET_H

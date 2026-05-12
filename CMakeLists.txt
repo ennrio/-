@@ -29,6 +29,7 @@ qt_add_executable(asudd
     simulationmanager.h simulationmanager.cpp
     constants.h
     accidentmanager.cpp
+    logger.h logger.cpp
 )
 
 target_link_libraries(asudd

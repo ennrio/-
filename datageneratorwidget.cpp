@@ -11,6 +11,7 @@
 #include <QTextStream>
 #include "simulationmanager.h"
 #include <QTimer>
+#include "logger.h"
 
 DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     : QWidget(parent)
@@ -205,6 +206,11 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     m_updateTimer->start(1000); // Обновляем каждую секунду
 }
 
+void DataGeneratorWidget::logAction(const QString& actionName)
+{
+    Logger::instance().logUserAction("DataGeneratorWidget_" + actionName);
+}
+
 void DataGeneratorWidget::updateStatus(bool isGenerating, int activeAccidents)
 {
     m_isGenerating = isGenerating;
@@ -254,6 +260,7 @@ void DataGeneratorWidget::updateStatus(bool isGenerating, int activeAccidents)
 
 void DataGeneratorWidget::startGeneration()
 {
+    logAction("StartGeneration");
     SimulationView* view = SimulationManager::instance().simulationView();
     if (view) {
         view->startSimulation();
@@ -268,6 +275,7 @@ void DataGeneratorWidget::startGeneration()
 
 void DataGeneratorWidget::stopGeneration()
 {
+    logAction("StopGeneration");
     SimulationView* view = SimulationManager::instance().simulationView();
     if (view) {
         view->stopSimulation();
@@ -277,6 +285,7 @@ void DataGeneratorWidget::stopGeneration()
 
 void DataGeneratorWidget::restartGeneration()
 {
+    logAction("RestartGeneration");
     SimulationView* view = SimulationManager::instance().simulationView();
     if (view) {
         // Полностью сбрасываем симуляцию - очищаем все данные
@@ -303,6 +312,7 @@ void DataGeneratorWidget::restartGeneration()
 
 void DataGeneratorWidget::onAccidentToggled(bool checked)
 {
+    logAction(QString("AccidentToggled_%1").arg(checked ? "ON" : "OFF"));
     auto& manager = SimulationManager::instance();
     if (manager.accidentManager()) {
         manager.accidentManager()->setAccidentsEnabled(checked);
@@ -317,6 +327,7 @@ void DataGeneratorWidget::onAccidentToggled(bool checked)
 
 void DataGeneratorWidget::onProbabilityChanged(const QString &text)
 {
+    logAction(QString("AccidentProbability_%1").arg(text));
     auto& manager = SimulationManager::instance();
     if (manager.accidentManager()) {
         // Парсим текст вероятности (например, "10%" -> 0.1)
@@ -332,6 +343,7 @@ void DataGeneratorWidget::onProbabilityChanged(const QString &text)
 
 void DataGeneratorWidget::onParkingToggled(bool checked)
 {
+    logAction(QString("ParkingToggled_%1").arg(checked ? "ON" : "OFF"));
     auto& manager = SimulationManager::instance();
     if (manager.simulationView()) {
         manager.simulationView()->setWrongParkingEnabled(checked);
@@ -346,6 +358,7 @@ void DataGeneratorWidget::onParkingToggled(bool checked)
 
 void DataGeneratorWidget::onParkingProbabilityChanged(const QString &text)
 {
+    logAction(QString("ParkingProbability_%1").arg(text));
     auto& manager = SimulationManager::instance();
     if (manager.simulationView()) {
         // Парсим текст вероятности (например, "10%" -> 0.1)
@@ -361,6 +374,7 @@ void DataGeneratorWidget::onParkingProbabilityChanged(const QString &text)
 
 void DataGeneratorWidget::onSaveProfile()
 {
+    logAction("SaveProfile");
     QString fileName = QFileDialog::getSaveFileName(this, "Сохранить профиль", 
                                                      QString(), "JSON Files (*.json)");
     if (fileName.isEmpty()) return;
@@ -383,6 +397,7 @@ void DataGeneratorWidget::onSaveProfile()
 
 void DataGeneratorWidget::onLoadProfile()
 {
+    logAction("LoadProfile");
     QString fileName = QFileDialog::getOpenFileName(this, "Загрузить профиль", 
                                                      QString(), "JSON Files (*.json)");
     if (fileName.isEmpty()) return;
