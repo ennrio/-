@@ -29,6 +29,7 @@ private slots:
     void updateMainScreen();
     void onExportLogsClicked();
     void onDiagnosticClicked();
+    void onPeriodicLogging();
 
 private:
     QVBoxLayout *m_mainLayout;
@@ -60,6 +61,7 @@ private:
 
     QTimer *m_updateTimer;
     QTimer *m_shiftTimer;
+    QTimer *m_loggingTimer;
     QDateTime m_shiftStartTime;
 
     // регистрационные параметры

@@ -620,6 +620,36 @@ void SimulationView::checkTrafficCongestion()
     }
 }
 
+int SimulationView::getIntersectionCongestionCount() const
+{
+    int congestionCount = 0;
+    const qreal checkRadius = 60.0;
+    
+    for (auto it = m_trafficLights.begin(); it != m_trafficLights.end(); ++it) {
+        TrafficLight* tl = it.value();
+        QPointF tlPos = tl->position();
+        int vehicleCount = 0;
+
+        // Считаем активные машины в радиусе перед светофором
+        for (auto vIt = m_vehicles.begin(); vIt != m_vehicles.end(); ++vIt) {
+            Vehicle* v = vIt.value();
+            if (v && v->isActive()) {
+                QPointF vPos = v->position();
+                if (QLineF(tlPos, vPos).length() < checkRadius) {
+                    vehicleCount++;
+                }
+            }
+        }
+        
+        // Если машин >= 3, считаем это затором
+        if (vehicleCount >= 3) {
+            congestionCount++;
+        }
+    }
+    
+    return congestionCount;
+}
+
 
 QList<QPointF> SimulationView::calculateRouteAsync()
 {

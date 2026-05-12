@@ -102,6 +102,9 @@ public:
     // Получить количество неправильных парковок
     int getWrongParkingCount() const { return m_wrongParkedVehicles.count(); }
     
+    // Получить количество заторов на перекрёстках
+    int getIntersectionCongestionCount() const;
+    
     // Обновление маркеров ДТП
     void updateAccidentMarkers();
     void updateWrongParkingMarkers();
