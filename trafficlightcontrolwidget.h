@@ -29,6 +29,9 @@ private slots:
     void onWaySelected();
 
 private:
+    void logAction(const QString &actionName);
+
+private:
     QGroupBox *m_controlGroupBox;
     QGroupBox *m_paramsGroupBox;
     QGroupBox *m_priorityGroupBox;
