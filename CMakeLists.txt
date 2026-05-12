@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 project(asudd LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Concurrent Widgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Concurrent Widgets PrintSupport)
 
 
 qt_standard_project_setup()
@@ -37,6 +37,7 @@ target_link_libraries(asudd
         Qt::Core
         Qt6::Concurrent
         Qt::Widgets
+        Qt6::PrintSupport
 )
 
 include(GNUInstallDirs)
