@@ -1,1 +1,10 @@
-Nothing should be ignored based on the provided file changes. The only modified file is `logger.cpp`, which is a source code file and should not be added to .gitignore.
+```
+# Build artifacts
+build/
+CMakeCache.txt
+CMakeFiles/
+
+# Compiled files
+*.bin
+*.out
+```
