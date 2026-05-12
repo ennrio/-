@@ -119,7 +119,16 @@ void Logger::log(LogType type, const QString& eventName)
     
     QMutexLocker locker(&m_mutex);
     
-    if (!m_logFile.isOpen() && !openLogFile()) {
+    // Проверяем, открыт ли файл, и пытаемся открыть если нет
+    if (!m_logFile.isOpen()) {
+        if (!openLogFile()) {
+            // Не удалось открыть файл - выходим без записи
+            return;
+        }
+    }
+    
+    // Дополнительная проверка: устройство потока должно быть валидным
+    if (m_logStream.device() == nullptr) {
         return;
     }
     
