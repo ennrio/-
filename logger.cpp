@@ -12,6 +12,7 @@ Logger::Logger(QObject* parent)
     : QObject(parent)
     , m_initialized(false)
     , m_systemLogTimer(nullptr)
+    , m_customLogTimer(nullptr)
 {
     // Создаем директорию reports в корне проекта
     QString reportsDir = QDir::currentPath() + "/reports";
@@ -24,6 +25,10 @@ Logger::Logger(QObject* parent)
 Logger::~Logger()
 {
     stopSystemLogging();
+    if (m_customLogTimer) {
+        m_customLogTimer->stop();
+        delete m_customLogTimer;
+    }
     closeLogFile();
 }
 
@@ -177,6 +182,28 @@ void Logger::stopSystemLogging()
     if (m_systemLogTimer) {
         m_systemLogTimer->stop();
     }
+}
+
+void Logger::startPeriodicSystemLog(int intervalMs, const std::function<QString()>& dataCallback)
+{
+    if (m_customLogTimer) {
+        m_customLogTimer->stop();
+    } else {
+        m_customLogTimer = new QTimer(this);
+    }
+    
+    m_customLogCallback = dataCallback;
+    
+    connect(m_customLogTimer, &QTimer::timeout, this, [this]() {
+        if (m_customLogCallback && m_initialized) {
+            QString logData = m_customLogCallback();
+            if (!logData.isEmpty()) {
+                logSystemEvent(logData);
+            }
+        }
+    });
+    
+    m_customLogTimer->start(intervalMs);
 }
 
 QString Logger::currentLogFile() const

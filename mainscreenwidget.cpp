@@ -169,6 +169,13 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     // Подключаем сигнал timeout к нашему новому слоту
     connect(m_updateTimer, &QTimer::timeout, this, &MainScreenWidget::updateMainScreen);
     m_updateTimer->start();
+    
+    // Таймер для периодического логирования каждые 30 секунд
+    m_loggingTimer = new QTimer(this);
+    m_loggingTimer->setInterval(30000);
+    connect(m_loggingTimer, &QTimer::timeout, this, &MainScreenWidget::onPeriodicLogging);
+    m_loggingTimer->start();
+    
     // Загружаем
     m_simulationView->setWindowTitle("Тест");
     m_simulationView->resize(600, 400);
@@ -252,6 +259,26 @@ void MainScreenWidget::updateMainScreen()
     // Обновляем количество активных инцидентов (ДТП)
     int activeAccidents = SimulationManager::instance().getActiveAccidentsCount();
     m_incidentsCount->setText(QString::number(activeAccidents+ m_simulationView->getWrongParkingCount()));
+}
+
+void MainScreenWidget::onPeriodicLogging()
+{
+    // Получаем данные из виджетов для логирования
+    int connectedDevices = m_simulationView->getActiveVehicleCount();
+    int activeIncidents = SimulationManager::instance().getActiveAccidentsCount() + m_simulationView->getWrongParkingCount();
+    double averageSpeed = m_simulationView->getAverageSpeed();
+    double roadLoad = 0.0;
+    
+    if (connectedDevices && maxCountVehicle) {
+        roadLoad = (double)connectedDevices / maxCountVehicle * 100;
+    }
+    
+    // Формируем строку для логирования с тегом system
+    QString logMessage = QString(
+        "MainScreenWidget: Подключено устройств: %1, Активных инцидентов: %2, Средняя скорость: %3 км/ч, Загруженность дорог: %4%%"
+    ).arg(connectedDevices).arg(activeIncidents).arg(averageSpeed, 0, 'f', 1).arg(roadLoad, 0, 'f', 1);
+    
+    Logger::instance().logSystemEvent(logMessage);
 }
 
 void MainScreenWidget::onExportLogsClicked()
