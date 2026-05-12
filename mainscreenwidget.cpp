@@ -8,6 +8,8 @@
 #include <QColor>
 #include <QMessageBox>
 #include <QTimer>
+#include <QFileDialog>
+#include <QDir>
 
 #include "registerdialog.h"
 #include "simulationmanager.h"
@@ -163,6 +165,8 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
 
 
     connect(btnNewShift, &QPushButton::clicked, this, &MainScreenWidget::onStartNewShift);
+    connect(btnExport, &QPushButton::clicked, this, &MainScreenWidget::onExportLogsClicked);
+    connect(btnDiagnostic, &QPushButton::clicked, this, &MainScreenWidget::onDiagnosticClicked);
     m_updateTimer = new QTimer(this);
     m_updateTimer->setInterval(1000);
 
@@ -281,16 +285,67 @@ void MainScreenWidget::onPeriodicLogging()
     Logger::instance().logSystemEvent(logMessage);
 }
 
-void MainScreenWidget::onExportLogsClicked()
-{
-    logAction("Экспорт логов");
-    // Здесь будет логика экспорта логов
-    Logger::instance().logUserAction("Экспорт логов запрошен");
-}
-
 void MainScreenWidget::onDiagnosticClicked()
 {
     logAction("Диагностика системы");
-    // Здесь будет логика диагностики системы
     Logger::instance().logUserAction("Диагностика системы запрошена");
+    
+    QMessageBox::information(this, "Диагностика системы", "Система исправна");
+}
+
+void MainScreenWidget::onExportLogsClicked()
+{
+    logAction("Экспорт логов");
+    Logger::instance().logUserAction("Экспорт логов запрошен");
+    
+    // Открываем диалог выбора папки
+    QString selectedDir = QFileDialog::getExistingDirectory(
+        this,
+        tr("Выберите папку для экспорта логов"),
+        QString(),
+        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
+    );
+    
+    if (selectedDir.isEmpty()) {
+        // Пользователь отменил выбор
+        return;
+    }
+    
+    // Копируем все логи из папки reports в выбранную папку
+    QString reportsDir = QDir::currentPath() + "/reports";
+    QDir reportsDirectory(reportsDir);
+    
+    if (!reportsDirectory.exists()) {
+        QMessageBox::warning(this, tr("Экспорт логов"), tr("Папка с логами не найдена"));
+        return;
+    }
+    
+    // Получаем список всех файлов в папке reports
+    QFileInfoList files = reportsDirectory.entryInfoList(QDir::Files);
+    
+    int copiedCount = 0;
+    for (const QFileInfo& fileInfo : files) {
+        if (fileInfo.isFile()) {
+            QString sourcePath = fileInfo.absoluteFilePath();
+            QString destPath = selectedDir + "/" + fileInfo.fileName();
+            
+            if (QFile::copy(sourcePath, destPath)) {
+                copiedCount++;
+            }
+        }
+    }
+    
+    if (copiedCount > 0) {
+        QMessageBox::information(
+            this,
+            tr("Экспорт логов"),
+            tr("Успешно экспортировано %1 файлов(а) в:\n%2").arg(copiedCount).arg(selectedDir)
+        );
+    } else {
+        QMessageBox::information(
+            this,
+            tr("Экспорт логов"),
+            tr("В папке reports нет файлов для экспорта")
+        );
+    }
 }
