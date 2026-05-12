@@ -7,7 +7,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core Concurrent Widgets)
 qt_standard_project_setup()
 
 qt_add_executable(asudd
-    WIN32 MACOSX_BUNDLE
+    #WIN32 MACOSX_BUNDLE
     mainwindow.h
     mainwindow.ui
     main.cpp

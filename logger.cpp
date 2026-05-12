@@ -3,6 +3,7 @@
 #include <QStandardPaths>
 #include <QCoreApplication>
 #include <QRegularExpression>
+#include <QMutex>
 
 // Статический экземпляр singleton
 static Logger* g_loggerInstance = nullptr;
@@ -37,17 +38,16 @@ Logger& Logger::instance()
 void Logger::initialize(const QString& operatorName, const QString& widgetName)
 {
     QMutexLocker locker(&m_mutex);
-    
+
     m_operatorName = operatorName;
     m_widgetName = widgetName;
-    
-    // Закрываем предыдущий файл если был открыт
+
     closeLogFile();
-    
-    // Открываем новый файл
+
     if (openLogFile()) {
         m_initialized = true;
-        logSystemEvent("Logger initialized for operator: " + operatorName + ", widget: " + widgetName);
+        // ✅ Вызываем logInternal, потому что мьютекс уже взят!
+        logInternal(LogType::System, "Logger initialized for operator: " + operatorName + ", widget: " + widgetName);
     }
 }
 
@@ -56,32 +56,62 @@ bool Logger::openLogFile()
     if (m_logFile.isOpen()) {
         closeLogFile();
     }
-    
+
     QString fileName = generateFileName();
+
+    // Создаём директорию, если нет
+    QFileInfo fileInfo(fileName);
+    QDir dir(fileInfo.absolutePath());
+    if (!dir.exists() && !dir.mkpath(".")) {
+        qCritical() << "[Logger] ❌ Не удалось создать папку:" << dir.absolutePath();
+        return false;
+    }
+
     m_logFile.setFileName(fileName);
-    
-    // Открываем в режиме добавления (Append)
+
     if (m_logFile.open(QIODevice::Append | QIODevice::Text)) {
-        // Устанавливаем устройство для потока только после успешного открытия
+        // ✅ Ключевой момент: setDevice ТОЛЬКО после успешного open()
         m_logStream.setDevice(&m_logFile);
         m_currentLogFile = fileName;
+        qDebug() << "[Logger] ✅ Файл открыт:" << fileName;
         return true;
     }
-    
-    // Если не удалось открыть файл, убеждаемся что поток не имеет устройства
-    m_logStream.setDevice(nullptr);
-    m_currentLogFile.clear();
+
+    qCritical() << "[Logger] ❌ Ошибка открытия:" << fileName
+                << "\n   Причина:" << m_logFile.errorString();
     return false;
 }
 
 void Logger::closeLogFile()
 {
-    if (m_logFile.isOpen()) {
+    // ✅ Порядок критичен: сначала отключаем stream, потом закрываем файл
+    if (m_logStream.device() != nullptr) {
         m_logStream.flush();
-        m_logFile.close();
+        m_logStream.setDevice(nullptr);  // ← 1. Отключаем stream
     }
-    m_logStream.setDevice(nullptr);
+
+    if (m_logFile.isOpen()) {
+        m_logFile.close();  // ← 2. Закрываем файл
+    }
+
     m_currentLogFile.clear();
+}
+
+void Logger::logInternal(LogType type, const QString &eventName)
+{
+    if (!m_logFile.isOpen() && !openLogFile()) {
+        return;
+    }
+
+    if (m_logStream.device() == nullptr) {
+        return;
+    }
+
+    QString typeStr = (type == LogType::User) ? "user" : "system";
+    QString timeStr = getCurrentTimeStr();
+
+    m_logStream << "[" << typeStr << ", " << timeStr << ", " << eventName << "]" << Qt::endl;
+    m_logStream.flush();
 }
 
 QString Logger::generateFileName() const
@@ -90,15 +120,15 @@ QString Logger::generateFileName() const
     // Заменяем пробелы и спецсимволы на подчеркивания
     QString cleanOperator = m_operatorName;
     cleanOperator.replace(QRegularExpression("[^a-zA-Z0-9а-яА-ЯёЁ]"), "_");
-    
+
     QString cleanWidget = m_widgetName;
     cleanWidget.replace(QRegularExpression("[^a-zA-Z0-9а-яА-ЯёЁ]"), "_");
-    
+
     QString dateStr = getCurrentDateStr();
-    
-    return QDir::currentPath() + "/reports/" + 
-           cleanWidget + "_" + 
-           cleanOperator + "_" + 
+
+    return QDir::currentPath() + "/reports/" +
+           cleanWidget + "_" +
+           cleanOperator + "_" +
            dateStr + ".log";
 }
 
@@ -114,31 +144,10 @@ QString Logger::getCurrentTimeStr() const
 
 void Logger::log(LogType type, const QString& eventName)
 {
-    if (!m_initialized) {
-        return;
-    }
-    
-    QMutexLocker locker(&m_mutex);
-    
-    // Проверяем, открыт ли файл, и пытаемся открыть если нет
-    if (!m_logFile.isOpen()) {
-        if (!openLogFile()) {
-            // Не удалось открыть файл - выходим без записи
-            return;
-        }
-    }
-    
-    // Дополнительная проверка: устройство потока должно быть валидным
-    if (m_logStream.device() == nullptr) {
-        return;
-    }
-    
-    QString typeStr = (type == LogType::User) ? "user" : "system";
-    QString timeStr = getCurrentTimeStr();
-    
-    // Формат: [тип, время, имя_кнопки]
-    m_logStream << "[" << typeStr << ", " << timeStr << ", " << eventName << "]" << Qt::endl;
-    m_logStream.flush();
+    if (!m_initialized) return;
+
+    QMutexLocker locker(&m_mutex);  // ← Берём мьютекс здесь
+    logInternal(type, eventName);   // ← Вызываем внутреннюю версию
 }
 
 void Logger::logUserAction(const QString& buttonName)

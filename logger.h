@@ -95,6 +95,7 @@ private:
      * @brief Закрыть текущий файл лога
      */
     void closeLogFile();
+    void logInternal(LogType type, const QString& eventName);
 
     /**
      * @brief Сформировать имя файла лога
