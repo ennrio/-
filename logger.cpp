@@ -33,12 +33,11 @@ Logger& Logger::instance()
     return *g_loggerInstance;
 }
 
-void Logger::initialize(const QString& operatorName, const QString& widgetName)
+void Logger::initialize(const QString& operatorName)
 {
     QMutexLocker locker(&m_mutex);
     
     m_operatorName = operatorName;
-    m_widgetName = widgetName;
     
     // Закрываем предыдущий файл если был открыт
     closeLogFile();
@@ -46,7 +45,7 @@ void Logger::initialize(const QString& operatorName, const QString& widgetName)
     // Открываем новый файл
     if (openLogFile()) {
         m_initialized = true;
-        logSystemEvent("Logger initialized for operator: " + operatorName + ", widget: " + widgetName);
+        logSystemEvent("Logger initialized for operator: " + operatorName);
     }
 }
 
@@ -85,25 +84,16 @@ void Logger::closeLogFile()
 
 QString Logger::generateFileName() const
 {
-    // Формат: <widget>_<operator>_<date>.log
-    // Заменяем пробелы и спецсимволы на подчеркивания
+    // Формат: all_widgets_<operator>_<date>.log (единый файл для всех виджетов)
     QString cleanOperator = m_operatorName;
     cleanOperator.replace(QRegExp("[^a-zA-Z0-9а-яА-ЯёЁ]"), "_");
     
-    QString cleanWidget = m_widgetName;
-    cleanWidget.replace(QRegExp("[^a-zA-Z0-9а-яА-ЯёЁ]"), "_");
-    
-    QString dateStr = getCurrentDateStr();
+    QString dateStr = QDateTime::currentDateTime().toString("yyyy-MM-dd");
     
     return QDir::currentPath() + "/reports/" + 
-           cleanWidget + "_" + 
+           "all_widgets_" + 
            cleanOperator + "_" + 
            dateStr + ".log";
-}
-
-QString Logger::getCurrentDateStr() const
-{
-    return QDateTime::currentDateTime().toString("yyyy-MM-dd");
 }
 
 QString Logger::getCurrentTimeStr() const

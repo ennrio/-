@@ -12,8 +12,8 @@
 /**
  * @brief Класс для логирования действий пользователя и системных событий
  * 
- * Создает log-файлы в папке reports/ с именем формата:
- * <имя_виджета>_<оператор>_<дата>.log
+ * Создает единый log-файл в папке reports/ с именем формата:
+ * all_widgets_<оператор>_<дата>.log
  * 
  * Формат записи: [тип, время, имя_кнопки/события]
  * Типы событий:
@@ -39,9 +39,8 @@ public:
     /**
      * @brief Инициализировать логгер с данными оператора
      * @param operatorName Имя оператора
-     * @param widgetName Имя виджета/экрана
      */
-    void initialize(const QString& operatorName, const QString& widgetName);
+    void initialize(const QString& operatorName);
 
     /**
      * @brief Записать событие в лог
@@ -102,11 +101,6 @@ private:
     QString generateFileName() const;
 
     /**
-     * @brief Получить текущую дату в формате для имени файла
-     */
-    QString getCurrentDateStr() const;
-
-    /**
      * @brief Получить текущее время в формате для лога
      */
     QString getCurrentTimeStr() const;
@@ -115,7 +109,6 @@ private:
     QFile m_logFile;
     QTextStream m_logStream;
     QString m_operatorName;
-    QString m_widgetName;
     QString m_currentLogFile;
     QMutex m_mutex;
     bool m_initialized;

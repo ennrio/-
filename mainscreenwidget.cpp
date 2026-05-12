@@ -191,7 +191,7 @@ void MainScreenWidget::onStartNewShift()
         this->m_startTimeLabel->setText("Начало смены: " + startTime);
 
         // Инициализируем логгер с данными оператора
-        Logger::instance().initialize(name, "MainScreenWidget");
+        Logger::instance().initialize(name);
 
         m_shiftTimer = new QTimer(this); // родитель this — таймер удалится автоматически
         m_shiftStartTime = QDateTime::currentDateTime(); // сохраняем время начала
