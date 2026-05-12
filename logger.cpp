@@ -2,6 +2,7 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QCoreApplication>
+#include <QRegularExpression>
 
 // Статический экземпляр singleton
 static Logger* g_loggerInstance = nullptr;
@@ -88,10 +89,10 @@ QString Logger::generateFileName() const
     // Формат: <widget>_<operator>_<date>.log
     // Заменяем пробелы и спецсимволы на подчеркивания
     QString cleanOperator = m_operatorName;
-    cleanOperator.replace(QRegExp("[^a-zA-Z0-9а-яА-ЯёЁ]"), "_");
+    cleanOperator.replace(QRegularExpression("[^a-zA-Z0-9а-яА-ЯёЁ]"), "_");
     
     QString cleanWidget = m_widgetName;
-    cleanWidget.replace(QRegExp("[^a-zA-Z0-9а-яА-ЯёЁ]"), "_");
+    cleanWidget.replace(QRegularExpression("[^a-zA-Z0-9а-яА-ЯёЁ]"), "_");
     
     QString dateStr = getCurrentDateStr();
     

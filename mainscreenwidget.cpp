@@ -176,6 +176,11 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
 
 }
 
+void MainScreenWidget::logAction(const QString &actionName)
+{
+    Logger::instance().logUserAction("MainScreenWidget_" + actionName);
+}
+
 void MainScreenWidget::onStartNewShift()
 {
     logAction("StartNewShift");
