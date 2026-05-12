@@ -45,17 +45,6 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
     // Период анализа с кнопкой загрузки логов
     QHBoxLayout *periodLayout = new QHBoxLayout;
     periodLayout->addWidget(new QLabel("Период анализа:"));
-    m_periodCombo = new QComboBox;
-    m_periodCombo->addItems({
-        "Выберите период",
-        "Текущая смена",
-        "Сегодня",
-        "Вчера",
-        "Текущая неделя",
-        "Текущий месяц",
-        "Произвольный период"
-    });
-    periodLayout->addWidget(m_periodCombo);
     
     QPushButton *applyPeriodBtn = new QPushButton("Загрузить .log файлы");
     connect(applyPeriodBtn, &QPushButton::clicked, this, &AnalyticsWidget::onLoadLogsClicked);
@@ -136,11 +125,6 @@ AnalyticsWidget::AnalyticsWidget(QWidget *parent)
 
     reportsGroupBox->setLayout(reportsLayout);
     mainLayout->addWidget(reportsGroupBox);
-}
-
-void AnalyticsWidget::onPeriodClicked()
-{
-    Logger::instance().logUserAction("AnalyticsWidget: Выбор периода - " + m_periodCombo->currentText());
 }
 
 void AnalyticsWidget::onLoadLogsClicked()

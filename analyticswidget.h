@@ -2,7 +2,6 @@
 #define ANALYTICSWIDGET_H
 
 #include <QWidget>
-#include <QComboBox>
 #include <QLabel>
 #include <QPushButton>
 #include <QGroupBox>
@@ -27,7 +26,6 @@ public:
     explicit AnalyticsWidget(QWidget *parent = nullptr);
 
 private slots:
-    void onPeriodClicked();
     void onLoadLogsClicked();
     void onGenerateReportPdfClicked();
     void onGenerateReportExcelClicked();
@@ -37,7 +35,6 @@ private:
     void updateMetrics();
     void drawCharts();
 
-    QComboBox *m_periodCombo;
     QPushButton *m_loadLogsBtn;
     QLabel *m_avgTimeLabel, *m_accidentsLabel;
     QLabel *m_devicesChartLabel, *m_jamsChartLabel;

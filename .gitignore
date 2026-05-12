@@ -1,9 +1,1 @@
-```
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-
-# Original rules preserved
-*.log
-```
+Nothing should be ignored since only source code files (.cpp and .h) were modified.
