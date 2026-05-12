@@ -10,6 +10,7 @@
 #include <QComboBox>
 #include <QMap>
 #include <QHBoxLayout>
+#include <QTimer>
 #include "visualization/simulationview.h"  // Отсюда берём CrossingInfo
 
 class TrafficLightControlWidget : public QWidget
@@ -27,6 +28,7 @@ private slots:
     void onApplyClicked();
     void onResetClicked();
     void onWaySelected();
+    void onPeriodicLogging();
 
 private:
     void logAction(const QString &actionName);
@@ -47,6 +49,7 @@ private:
     SimulationView* sv;
     QMap<long long, CrossingInfo> m_crossingsMap;
     long long m_selectedCrossingId;
+    QTimer *m_loggingTimer;
 
     void updateCrossingListItem(long long id);
     void loadCrossingParams(long long id);

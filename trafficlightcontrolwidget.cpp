@@ -158,6 +158,12 @@ TrafficLightControlWidget::TrafficLightControlWidget(QWidget *parent)
 
     onModeChanged(m_modeComboBox->currentText());
     connect(m_priorityList, &QListWidget::itemClicked, this, &TrafficLightControlWidget::onWaySelected);
+    
+    // Таймер для периодического логирования каждые 30 секунд
+    m_loggingTimer = new QTimer(this);
+    m_loggingTimer->setInterval(30000);
+    connect(m_loggingTimer, &QTimer::timeout, this, &TrafficLightControlWidget::onPeriodicLogging);
+    m_loggingTimer->start();
 }
 
 void TrafficLightControlWidget::syncWithSimulation()
@@ -647,4 +653,19 @@ QString TrafficLightControlWidget::formatResetMessage(const QList<long long> &tl
 void TrafficLightControlWidget::logAction(const QString &actionName)
 {
     Logger::instance().logUserAction("TrafficLightControlWidget: " + actionName);
+}
+
+void TrafficLightControlWidget::onPeriodicLogging()
+{
+    if (!sv) return;
+    
+    // Получаем количество заторов на перекрестках из SimulationView
+    int congestionCount = sv->getIntersectionCongestionCount();
+    
+    // Формируем строку для логирования с тегом system
+    QString logMessage = QString(
+        "TrafficLightControlWidget: Кол-во заторов на перекрёстках: %1"
+    ).arg(congestionCount);
+    
+    Logger::instance().logSystemEvent(logMessage);
 }

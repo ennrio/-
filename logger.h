@@ -8,6 +8,8 @@
 #include <QDateTime>
 #include <QMutex>
 #include <QDir>
+#include <QTimer>
+#include <functional>
 
 /**
  * @brief Класс для логирования действий пользователя и системных событий
@@ -72,6 +74,13 @@ public:
      * @brief Остановить периодическое логирование системы
      */
     void stopSystemLogging();
+    
+    /**
+     * @brief Запустить периодическое логирование с кастомными данными
+     * @param intervalMs Интервал в миллисекундах
+     * @param dataCallback Функция обратного вызова для получения данных для логирования
+     */
+    void startPeriodicSystemLog(int intervalMs, const std::function<QString()>& dataCallback);
 
     /**
      * @brief Получить текущее имя файла лога
@@ -123,6 +132,10 @@ private:
     
     // Для периодического системного логирования
     QTimer* m_systemLogTimer;
+    
+    // Для кастомного периодического логирования
+    QTimer* m_customLogTimer;
+    std::function<QString()> m_customLogCallback;
 };
 
 #endif // LOGGER_H
