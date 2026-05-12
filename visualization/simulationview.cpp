@@ -57,13 +57,17 @@ SimulationView::SimulationView(QWidget *parent)
     setSceneRect(-100, -100, 2000, 2000);
 
     // Таймер для спавна автомобилей
-    m_vehicleSpawnTimer.setInterval(3000); // Каждые 3 секунды
+    m_vehicleSpawnTimer.setInterval(100); // Каждые 100 мс
     connect(&m_vehicleSpawnTimer, &QTimer::timeout, this, &SimulationView::spawnVehicle);
 
 
     m_routeCalculationWatcher = new QFutureWatcher<QList<QPointF>>(this);
     connect(m_routeCalculationWatcher, &QFutureWatcher<QList<QPointF>>::finished,
             this, &SimulationView::onRouteCalculationFinished);
+    
+    // Инициализация пула воркеров для параллельного расчёта маршрутов
+    m_maxConcurrentRouteCalculations = 5;
+    m_activeRouteCalculations = 0;
 
 
     connect(this, &SimulationView::osmLoadingFinished,
@@ -526,13 +530,15 @@ LightState SimulationView::getTrafficLightStateAtPosition(const QPointF &positio
 
 void SimulationView::spawnVehicle()
 {
-    if (m_isLoading || m_vehicles.size() >= 5000) return;
+    if (m_isLoading || m_vehicles.size() >= 20000) return;
     if (m_roadGraph->nodeCount() < 2 || m_roadGraph->edgeCount() < 1) return;
 
-    // Если уже идёт расчёт — пропускаем этот спавн
-    if (m_routeCalculationWatcher->isRunning()) {
+    // Если достигнут лимит одновременных расчётов — пропускаем
+    if (m_activeRouteCalculations >= m_maxConcurrentRouteCalculations) {
         return;
     }
+
+    m_activeRouteCalculations++;
 
     auto future = QtConcurrent::run([this]() {
         return calculateRouteAsync();
@@ -543,6 +549,9 @@ void SimulationView::spawnVehicle()
 
 void SimulationView::onRouteCalculationFinished()
 {
+    // Уменьшаем счётчик активных расчётов
+    m_activeRouteCalculations--;
+
     QList<QPointF> routePoints = m_routeCalculationWatcher->result();
 
 

@@ -206,6 +206,10 @@ private:
     QTimer m_vehicleSpawnTimer;
     int m_vehicleCounter{0};
     int m_edgeIdCounter{1};
+    
+    // Многопоточный расчёт маршрутов
+    int m_maxConcurrentRouteCalculations;
+    int m_activeRouteCalculations;
 
     // Кэш текущего состояния "внимания", чтобы не слать сигналы лишний раз
     QTimer m_congestionCheckTimer;
