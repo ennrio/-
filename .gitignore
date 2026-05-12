@@ -1,1 +1,9 @@
-Nothing should be ignored based on the provided file changes. The only modified file is `mainscreenwidget.cpp`, which is a source code file and should not be added to .gitignore.
+```
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Original rules preserved
+*.log
+```
