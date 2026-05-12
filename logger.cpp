@@ -61,11 +61,15 @@ bool Logger::openLogFile()
     
     // Открываем в режиме добавления (Append)
     if (m_logFile.open(QIODevice::Append | QIODevice::Text)) {
+        // Устанавливаем устройство для потока только после успешного открытия
         m_logStream.setDevice(&m_logFile);
         m_currentLogFile = fileName;
         return true;
     }
     
+    // Если не удалось открыть файл, убеждаемся что поток не имеет устройства
+    m_logStream.setDevice(nullptr);
+    m_currentLogFile.clear();
     return false;
 }
 
