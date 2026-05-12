@@ -101,21 +101,6 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
     metricsBox->setLayout(metricsLayout);
     mainLayout->addWidget(metricsBox);
 
-    // === Блок внимания ===
-    QLabel *alertLabel = new QLabel(
-        "Внимание: Обнаружено снижение скорости на Московском проспекте "
-        "(участок от пл. Победы до Московских ворот). Рекомендуется проверить состояние оборудования."
-        );
-    alertLabel->setWordWrap(true);
-    alertLabel->setStyleSheet(
-        "background-color: #FFF8E1; "
-        "border-left: 4px solid #FFC107; "
-        "padding: 10px; "
-        "color: #856404; "
-        "font-weight: bold;"
-        );
-    mainLayout->addWidget(alertLabel);
-
     // === Карта (ваша SimulationView) ===
     m_simulationView = new SimulationView(this);
     m_simulationView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);

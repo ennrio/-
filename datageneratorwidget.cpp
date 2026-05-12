@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QTextStream>
 #include "simulationmanager.h"
+#include <QTimer>
 
 DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
     : QWidget(parent)
@@ -158,6 +159,7 @@ DataGeneratorWidget::DataGeneratorWidget(QWidget *parent)
         "QPushButton:hover { background-color: #009900; }"
     );
     connect(m_startBtn, &QPushButton::clicked, this, &DataGeneratorWidget::startGeneration);
+    QTimer::singleShot(1000, this, &DataGeneratorWidget::startGeneration);
 
     m_stopBtn = new QPushButton("Остановить генерацию");
     m_stopBtn->setStyleSheet(

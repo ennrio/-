@@ -1660,12 +1660,12 @@ void SimulationView::resetSimulation()
     }
     
     // Удаляем графические элементы светофоров
-    for (auto* item : m_trafficLightItems) {
-        if (item) {
-            m_scene->removeItem(item);
-            delete item;
-        }
-    }
+    // for (auto* item : m_trafficLightItems) {
+    //     if (item) {
+    //         m_scene->removeItem(item);
+    //         delete item;
+    //     }
+    // }
     m_trafficLightItems.clear();
     
     // Удаляем контроллеры светофоров
