@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QTimer>
 #include "visualization/simulationview.h"
+#include "logger.h"
 
 class DataGeneratorWidget : public QWidget
 {
@@ -30,6 +31,9 @@ private slots:
     void onSaveProfile();
     void onLoadProfile();
     void updateAccidentCount();
+    
+private:
+    void logAction(const QString& actionName);
 
 private:
     QComboBox *m_profileCombo;

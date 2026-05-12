@@ -178,6 +178,7 @@ MainScreenWidget::MainScreenWidget(QWidget *parent)
 
 void MainScreenWidget::onStartNewShift()
 {
+    logAction("StartNewShift");
     RegisterDialog dialog(this,is_first);
 
     if (dialog.exec() == QDialog::Accepted) {
@@ -188,6 +189,9 @@ void MainScreenWidget::onStartNewShift()
 
         this->m_operatorLabel->setText("Оператор: " + name + " (" + role + ")");
         this->m_startTimeLabel->setText("Начало смены: " + startTime);
+
+        // Инициализируем логгер с данными оператора
+        Logger::instance().initialize(name, "MainScreenWidget");
 
         m_shiftTimer = new QTimer(this); // родитель this — таймер удалится автоматически
         m_shiftStartTime = QDateTime::currentDateTime(); // сохраняем время начала
@@ -243,4 +247,18 @@ void MainScreenWidget::updateMainScreen()
     // Обновляем количество активных инцидентов (ДТП)
     int activeAccidents = SimulationManager::instance().getActiveAccidentsCount();
     m_incidentsCount->setText(QString::number(activeAccidents+ m_simulationView->getWrongParkingCount()));
+}
+
+void MainScreenWidget::onExportLogsClicked()
+{
+    logAction("ExportLogs");
+    // Здесь будет логика экспорта логов
+    Logger::instance().logSystemEvent("Export logs requested");
+}
+
+void MainScreenWidget::onDiagnosticClicked()
+{
+    logAction("Diagnostic");
+    // Здесь будет логика диагностики системы
+    Logger::instance().logSystemEvent("System diagnostic requested");
 }

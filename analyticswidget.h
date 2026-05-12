@@ -6,6 +6,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QGroupBox>
+#include "logger.h"
 
 class AnalyticsWidget : public QWidget
 {
@@ -13,6 +14,16 @@ class AnalyticsWidget : public QWidget
 
 public:
     explicit AnalyticsWidget(QWidget *parent = nullptr);
+
+private slots:
+    void onPeriodApplyClicked();
+    void onDailyReportClicked();
+    void onWeeklyReportClicked();
+    void onMonthlyReportClicked();
+    void onCustomReportClicked();
+    void onCompareClicked();
+    void onExportClicked();
+    void onPrintClicked();
 
 private:
     QComboBox *m_periodCombo;

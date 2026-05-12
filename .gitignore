@@ -1,17 +1,11 @@
 ```
-# Build artifacts
-build/
-CMakeCache.txt
-CMakeFiles/
-
-# Compiled files
+# Compiled and build artifacts
 *.o
 *.obj
-*.a
-*.lib
-*.so
-*.dll
 *.exe
+*.dll
+*.so
+*.a
 *.out
 
 # Dependencies
@@ -19,32 +13,31 @@ node_modules/
 venv/
 .venv/
 __pycache__/
-*.egg-info/
-dist/
+.mypy_cache/
+.pytest_cache/
 target/
 .gradle/
 
-# Editor/IDE files
+# Build directories (common in C++ projects)
+build/
+dist/
+
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Logs and temp files
+*.log
 *.tmp
 
-# Logs
-*.log
+# System files
+.DS_Store
+Thumbs.db
 
-# Environment
+# Environment files
 .env
 .env.local
 *.env.*
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# OS generated files
-.DS_Store
-Thumbs.db
 ```
