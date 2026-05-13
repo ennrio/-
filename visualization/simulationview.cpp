@@ -16,7 +16,7 @@
 #include <QContextMenuEvent>
 #include <qmenu.h>
 #include "trafficlightitem.h"
-
+#include <QOpenGLWidget>
 
 
 
@@ -32,18 +32,31 @@ SimulationView::SimulationView(QWidget *parent)
     , m_accidentManager(nullptr)
 {
     setScene(m_scene);
-    setRenderHint(QPainter::Antialiasing);
+    //setRenderHint(QPainter::Antialiasing);
+// #if QT_VERSION >= QT_VERSION_CHECK(5, 4, 0)
+//     auto* glWidget = new QOpenGLWidget();
+//     setViewport(glWidget);
+//     setRenderHint(QPainter::Antialiasing, false); // OpenGL сам сглаживает
+//     setRenderHint(QPainter::SmoothPixmapTransform, true);
+//     if (viewport()) {
+//         //viewport()->setAttribute(Qt::WA_PaintOnScreen, true);
+//         viewport()->setAttribute(Qt::WA_NoSystemBackground, true);
+//         viewport()->setAttribute(Qt::WA_OpaquePaintEvent, true);
+
+//     }
+// #endif
 
 
     setDragMode(QGraphicsView::ScrollHandDrag);
-    setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
+    setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     setResizeAnchor(QGraphicsView::AnchorViewCenter);
 
     setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
-    setOptimizationFlags(QGraphicsView::DontSavePainterState);
+    setOptimizationFlags(QGraphicsView::DontSavePainterState |
+                         QGraphicsView::IndirectPainting);
 
     // Настройка таймера симуляции
     m_simulationTimer.setInterval(16); // ~60 FPS
@@ -61,19 +74,19 @@ SimulationView::SimulationView(QWidget *parent)
     connect(&m_vehicleSpawnTimer, &QTimer::timeout, this, &SimulationView::spawnVehicle);
 
 
-    m_routeCalculationWatcher = new QFutureWatcher<QList<QPointF>>(this);
-    connect(m_routeCalculationWatcher, &QFutureWatcher<QList<QPointF>>::finished,
-            this, &SimulationView::onRouteCalculationFinished);
+    //m_routeWatchers = new QFutureWatcher<QList<QPointF>>(this);
+   // connect(m_routeWatchers, &QFutureWatcher<QList<QPointF>>::finished,
+     //       this, &SimulationView::onRouteCalculationFinished);
 
-
+    QThreadPool::globalInstance()->setMaxThreadCount(8);
     connect(this, &SimulationView::osmLoadingFinished,
             this, &SimulationView::onOSMLoadingFinished,
             Qt::UniqueConnection);
 
-    m_congestionCheckTimer.setInterval(1000);
+    m_congestionCheckTimer.setInterval(100);
     connect(&m_congestionCheckTimer, &QTimer::timeout,
             this, &SimulationView::checkTrafficCongestion);
-    
+
     // Инициализация менеджера ДТП
     m_accidentManager = new AccidentManager(this);
     m_accidentManager->setSimulationView(this);
@@ -367,7 +380,7 @@ void SimulationView::updateSimulation()
             } else {
                 vehicle->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
             }
-            
+
             vehicle->update(deltaTime);
         }
 
@@ -378,15 +391,15 @@ void SimulationView::updateSimulation()
             if (vehicle->isRouteFinished()) {
                 // Проверяем, является ли парковка неправильной
                 bool isWrongParked = m_wrongParkedVehicles.contains(id);
-                
+
                 // Если машина только что завершила маршрут и была кандидатом на неправильную парковку
-                if (!isWrongParked && !m_wrongParkedVehicles.contains(id) && 
+                if (!isWrongParked && !m_wrongParkedVehicles.contains(id) &&
                     vehicle->property("wrongParkingCandidate").toBool() && m_wrongParkingEnabled) {
                     // Добавляем в список неправильно припаркованных
                     m_wrongParkedVehicles.append(id);
                     isWrongParked = true;
                 }
-                
+
                 if (isWrongParked) {
                     // Неправильная парковка - синий маркер с обводкой
                     item->setColor(Qt::blue);
@@ -417,7 +430,7 @@ void SimulationView::updateSimulation()
     if (m_accidentManager) {
         updateAccidentMarkers();
     }
-    
+
     // Обновляем маркеры неправильной парковки
     if (m_wrongParkingEnabled) {
         updateWrongParkingMarkers();
@@ -529,25 +542,40 @@ void SimulationView::spawnVehicle()
     if (m_isLoading || m_vehicles.size() >= 5000) return;
     if (m_roadGraph->nodeCount() < 2 || m_roadGraph->edgeCount() < 1) return;
 
-    // Если уже идёт расчёт — пропускаем этот спавн
-    if (m_routeCalculationWatcher->isRunning()) {
+    // Очистка завершённых воркеров
+    for (auto it = m_routeWatchers.begin(); it != m_routeWatchers.end(); ) {
+        if ((*it)->isFinished()) {
+            delete *it;
+            it = m_routeWatchers.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Если достигнут лимит — пропускаем спавн
+    if (m_routeWatchers.size() >= m_maxConcurrentRoutes) {
         return;
     }
+
+    auto* watcher = new QFutureWatcher<QList<QPointF>>(this);
+    connect(watcher, &QFutureWatcher<QList<QPointF>>::finished,
+            this, [this, watcher]() {
+                onRouteCalculationFinished(watcher->result());
+                m_routeWatchers.removeAll(watcher);
+                watcher->deleteLater();
+            });
 
     auto future = QtConcurrent::run([this]() {
         return calculateRouteAsync();
     });
-
-    m_routeCalculationWatcher->setFuture(future);
+    watcher->setFuture(future);
+    m_routeWatchers.append(watcher);
 }
 
-void SimulationView::onRouteCalculationFinished()
+void SimulationView::onRouteCalculationFinished(const QList<QPointF> &routePoints)
 {
-    QList<QPointF> routePoints = m_routeCalculationWatcher->result();
-
 
     if (routePoints.size() < 2) {
-        // qDebug() << "Route calculation failed";
         return;
     }
 
@@ -561,17 +589,12 @@ void SimulationView::onRouteCalculationFinished()
         });
         v->setTrafficLightAwareness(true);
         v->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
-
-        v->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
         v->setAcceleration(3.5);
         v->setDeceleration(5.0);
-        
-        // Проверяем вероятность неправильной парковки при создании машины
+
         if (m_wrongParkingEnabled && !v->isRouteFinished()) {
             double randomValue = QRandomGenerator::global()->generateDouble();
             if (randomValue < m_wrongParkingProbability) {
-                // Помечаем машину как кандидат на неправильную парковку
-                // Фактическая парковка будет определена когда машина завершит маршрут
                 v->setProperty("wrongParkingCandidate", true);
             }
         }
@@ -624,7 +647,7 @@ int SimulationView::getIntersectionCongestionCount() const
 {
     int congestionCount = 0;
     const qreal checkRadius = 60.0;
-    
+
     for (auto it = m_trafficLights.begin(); it != m_trafficLights.end(); ++it) {
         TrafficLight* tl = it.value();
         QPointF tlPos = tl->position();
@@ -640,13 +663,13 @@ int SimulationView::getIntersectionCongestionCount() const
                 }
             }
         }
-        
+
         // Если машин >= 3, считаем это затором
         if (vehicleCount >= 3) {
             congestionCount++;
         }
     }
-    
+
     return congestionCount;
 }
 
@@ -654,6 +677,9 @@ int SimulationView::getIntersectionCongestionCount() const
 QList<QPointF> SimulationView::calculateRouteAsync()
 {
     // Получаем только узлы с соседями - делаем копию для безопасности
+    static int callCount = 0;
+    callCount++;
+
     QList<int> connectedIds;
     auto allNodes = m_roadGraph->getNodes().keys();
     for (int nodeId : allNodes) {
@@ -663,9 +689,10 @@ QList<QPointF> SimulationView::calculateRouteAsync()
     }
 
     if (connectedIds.size() < 2) {
-        return QList<QPointF>();  // Пустой маршрут = ошибка
+        if (callCount % 20 == 0)
+            qDebug() << "[ROUTE] No connected nodes (call" << callCount << ")";
+        return QList<QPointF>();
     }
-
     // Пробуем найти маршрут (макс. 3 попытки)
     for (int attempt = 0; attempt < 3; ++attempt) {
         int start = connectedIds[QRandomGenerator::global()->bounded(connectedIds.size())];
@@ -677,13 +704,12 @@ QList<QPointF> SimulationView::calculateRouteAsync()
 
         // Конвертируем путь в координаты
         QList<QPointF> routePoints;
-        for (int nodeId : path) {
-            //  Доступ к m_osmToInternalId и m_osmNodePositions — только чтение, это безопасно
-            for (auto it = m_osmToInternalId.begin(); it != m_osmToInternalId.end(); ++it) {
-                if (it.value() == nodeId && m_osmNodePositions.contains(it.key())) {
-                    routePoints.append(m_osmNodePositions[it.key()]);
-                    break;
-                }
+        routePoints.reserve(path.size()); // Предварительное выделение памяти
+
+        for (int internalId : path) {
+            if (m_internalToOsmId.contains(internalId) &&
+                m_osmNodePositions.contains(m_internalToOsmId[internalId])) {
+                routePoints.append(m_osmNodePositions[m_internalToOsmId[internalId]]);
             }
         }
 
@@ -1106,12 +1132,13 @@ void SimulationView::processOsmChunk()
                     if (!m_osmNodePositions.contains(id)) {
                         m_osmNodePositions[id] = scenePos;
                         m_osmToInternalId[id] = m_internalIdCounter;
+                        m_internalToOsmId[m_internalIdCounter] = id;
                         m_roadGraph->addNode(m_internalIdCounter, scenePos.x(), scenePos.y());
 
                         // === ОТРИСОВКА СВЕТОФОРА ===
                         if (isTrafficLight) {
                             m_nodesWithTrafficLights.insert(id);  // Сохраняем узел со светофором
-                            
+
                             auto* tl = new TrafficLight(id, scenePos, direction, isPedestrian, this);
                             m_trafficLights[tl->id()] = tl;
                             m_trafficLightOsmId[tl->id()] = id;
@@ -1465,13 +1492,13 @@ QList<PendingWay> SimulationView::getAllWays() const
 {
     // Возвращаем только дороги, на которых есть светофоры
     QList<PendingWay> waysWithTrafficLights;
-    
+
     for (const PendingWay &way : m_tempWays) {
         if (hasTrafficLightsOnWay(way.nodeRefs)) {
             waysWithTrafficLights.append(way);
         }
     }
-    
+
     return waysWithTrafficLights;
 }
 
@@ -1500,13 +1527,13 @@ QMap<long long, QPointF> SimulationView::getAllNodePositions() const
 void SimulationView::updateAccidentMarkers()
 {
     if (!m_accidentManager) return;
-    
+
     // Получаем список активных ДТП
     QList<Accident> activeAccidents = m_accidentManager->getActiveAccidents();
-    
+
     // Временное хранение ID маркеров для текущего кадра
     static QMap<int, QGraphicsEllipseItem*> accidentMarkers;
-    
+
     // Удаляем маркеры для неактивных ДТП
     QList<int> toRemove;
     for (auto it = accidentMarkers.begin(); it != accidentMarkers.end(); ++it) {
@@ -1526,14 +1553,14 @@ void SimulationView::updateAccidentMarkers()
     for (int id : toRemove) {
         accidentMarkers.remove(id);
     }
-    
+
     // Создаём или обновляем маркеры для активных ДТП
     for (const Accident &accident : activeAccidents) {
         if (!accidentMarkers.contains(accident.id)) {
             // Создаём новый маркер - маленький красный круг (фиксированный размер 20px)
             int markerSize = 20; // Фиксированный небольшой размер
             QGraphicsEllipseItem *marker = new QGraphicsEllipseItem(
-                -markerSize/2, 
+                -markerSize/2,
                 -markerSize/2,
                 markerSize,
                 markerSize
@@ -1544,7 +1571,7 @@ void SimulationView::updateAccidentMarkers()
             marker->setZValue(10); // Выше машин
             m_scene->addItem(marker);
             accidentMarkers[accident.id] = marker;
-            
+
             qDebug() << "Accident marker created for ID:" << accident.id << "at" << accident.position;
         } else {
             // Обновляем позицию существующего маркера
@@ -1586,7 +1613,7 @@ void SimulationView::updateWrongParkingMarkers()
 {
     // Статический кэш маркеров неправильной парковки
     static QMap<int, QGraphicsEllipseItem*> parkingMarkers;
-    
+
     // Удаляем маркеры для машин, которые больше не припаркованы неправильно
     QList<int> toRemove;
     for (auto it = parkingMarkers.begin(); it != parkingMarkers.end(); ++it) {
@@ -1599,17 +1626,17 @@ void SimulationView::updateWrongParkingMarkers()
     for (int id : toRemove) {
         parkingMarkers.remove(id);
     }
-    
+
     // Создаём или обновляем маркеры для неправильно припаркованных машин
     for (int vehicleId : m_wrongParkedVehicles) {
         if (m_vehicles.contains(vehicleId)) {
             Vehicle* vehicle = m_vehicles[vehicleId];
-            
+
             if (!parkingMarkers.contains(vehicleId)) {
                 // Создаём новый маркер - синий круг меньшего размера (обводка)
                 QGraphicsEllipseItem *marker = new QGraphicsEllipseItem(
                     -8,   // x: -half width
-                    -8,   // y: -half height  
+                    -8,   // y: -half height
                     16,   // width: 16 pixels
                     16    // height: 16 pixels
                 );
@@ -1619,7 +1646,7 @@ void SimulationView::updateWrongParkingMarkers()
                 marker->setZValue(11); // Выше машин и ДТП
                 m_scene->addItem(marker);
                 parkingMarkers[vehicleId] = marker;
-                
+
                 qDebug() << "Wrong parking marker created for vehicle:" << vehicleId;
             } else {
                 // Обновляем позицию существующего маркера
@@ -1639,14 +1666,14 @@ void SimulationView::resetSimulation()
     m_simulationTimer.stop();
     m_vehicleSpawnTimer.stop();
     m_congestionCheckTimer.stop();
-    
+
     // Очищаем список неправильно припаркованных машин
     m_wrongParkedVehicles.clear();
-    
+
     // Сбрасываем флаг генерации неправильных парковок
     m_wrongParkingEnabled = false;
     m_wrongParkingProbability = 0.0;
-    
+
     // Очищаем и удаляем все маркеры неправильной парковки со сцены
     QList<QGraphicsItem*> items = m_scene->items();
     for (QGraphicsItem* item : items) {
@@ -1656,7 +1683,7 @@ void SimulationView::resetSimulation()
             delete item;
         }
     }
-    
+
     // Очищаем и удаляем все маркеры ДТП со сцены (Z-value 10)
     for (QGraphicsItem* item : m_scene->items()) {
         if (item->zValue() == 10) {
@@ -1664,7 +1691,7 @@ void SimulationView::resetSimulation()
             delete item;
         }
     }
-    
+
     // Очищаем менеджер ДТП
     if (m_accidentManager) {
         // Разрешаем все активные ДТП
@@ -1673,13 +1700,13 @@ void SimulationView::resetSimulation()
             m_accidentManager->resolveAccident(accident.id);
         }
     }
-    
+
     // Удаляем все транспортные средства
     qDeleteAll(m_vehicles);
     m_vehicles.clear();
     qDeleteAll(m_vehicleItems);
     m_vehicleItems.clear();
-    
+
     // === Очистка светофоров ===
     // Сначала отключаем все сигналы, чтобы избежать краша при удалении
     for (auto* tl : m_trafficLights) {
@@ -1687,7 +1714,7 @@ void SimulationView::resetSimulation()
             disconnect(tl, nullptr, this, nullptr);
         }
     }
-    
+
     // Удаляем графические элементы светофоров
     // for (auto* item : m_trafficLightItems) {
     //     if (item) {
@@ -1696,23 +1723,23 @@ void SimulationView::resetSimulation()
     //     }
     // }
     m_trafficLightItems.clear();
-    
+
     // Удаляем контроллеры светофоров
     qDeleteAll(m_controllers);
     m_controllers.clear();
-    
+
     // Удаляем объекты светофоров
     qDeleteAll(m_trafficLights);
     m_trafficLights.clear();
-    
+
     // Очищаем маппинг OSM ID
     m_trafficLightOsmId.clear();
     m_nodesWithTrafficLights.clear();
     m_currentAttentionState.clear();
-    
+
     // Сбрасываем счетчики
     m_vehicleCounter = 0;
-    
+
     qDebug() << "Simulation reset complete - all data cleared";
 }
 

@@ -126,7 +126,7 @@ private slots:
     void cycleTrafficLightState(long long id);
     void onOSMLoadingFinished();
     void spawnVehicle();
-    void onRouteCalculationFinished();
+    void onRouteCalculationFinished(const QList<QPointF> &routePoints);
     void checkTrafficCongestion();
 
 //METHODS
@@ -134,7 +134,6 @@ private:
     QList<QPointF> calculateRouteAsync();
     LightState getTrafficLightStateAtPosition(const QPointF& position, qreal radius);
     void updateVehicleGraphics();
-    QFutureWatcher<QList<QPointF>>* m_routeCalculationWatcher;
 
 
 //MEMBERS
@@ -218,6 +217,11 @@ private:
     bool m_wrongParkingEnabled{false};
     double m_wrongParkingProbability{0.0};
     QList<int> m_wrongParkedVehicles;  // ID неправильно припаркованных машин
+
+    QList<QFutureWatcher<QList<QPointF>>*> m_routeWatchers;
+    int m_maxConcurrentRoutes = 4;
+
+    QMap<int, long long> m_internalToOsmId;
     
 signals:
     void osmLoadingFinished();
