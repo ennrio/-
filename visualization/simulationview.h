@@ -129,7 +129,6 @@ private slots:
     void spawnVehicle();
     void onRouteCalculationFinished();
     void checkTrafficCongestion();
-    void onRouteCalculated(const QString &startId, const QString &endId, const QList<QPointF> &route);
 
 //METHODS
 private:
