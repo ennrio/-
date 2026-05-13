@@ -127,7 +127,6 @@ private slots:
     void cycleTrafficLightState(long long id);
     void onOSMLoadingFinished();
     void spawnVehicle();
-    void onRouteCalculationFinished();
     void checkTrafficCongestion();
 
 //METHODS
@@ -135,7 +134,7 @@ private:
     QList<QPointF> calculateRouteAsync();
     LightState getTrafficLightStateAtPosition(const QPointF& position, qreal radius);
     void updateVehicleGraphics();
-    QFutureWatcher<QList<QPointF>>* m_routeCalculationWatcher;
+    // m_routeCalculationWatcher удалён - теперь используется per-task watcher в spawnVehicle()
 
 
 //MEMBERS

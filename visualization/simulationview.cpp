@@ -61,15 +61,6 @@ SimulationView::SimulationView(QWidget *parent)
     connect(&m_vehicleSpawnTimer, &QTimer::timeout, this, &SimulationView::spawnVehicle);
 
 
-    m_routeCalculationWatcher = new QFutureWatcher<QList<QPointF>>(this);
-    connect(m_routeCalculationWatcher, &QFutureWatcher<QList<QPointF>>::finished,
-            this, &SimulationView::onRouteCalculationFinished);
-    
-    // Инициализация пула воркеров для параллельного расчёта маршрутов
-    m_maxConcurrentRouteCalculations = 5;
-    m_activeRouteCalculations = 0;
-
-
     connect(this, &SimulationView::osmLoadingFinished,
             this, &SimulationView::onOSMLoadingFinished,
             Qt::UniqueConnection);
@@ -81,6 +72,10 @@ SimulationView::SimulationView(QWidget *parent)
     // Инициализация менеджера ДТП
     m_accidentManager = new AccidentManager(this);
     m_accidentManager->setSimulationView(this);
+    
+    // Инициализация пула воркеров для параллельного расчёта маршрутов
+    m_maxConcurrentRouteCalculations = 5;
+    m_activeRouteCalculations = 0;
 }
 
 SimulationView::~SimulationView()
@@ -540,54 +535,52 @@ void SimulationView::spawnVehicle()
 
     m_activeRouteCalculations++;
 
+    // Создаём новый watcher для каждой задачи
+    auto* watcher = new QFutureWatcher<QList<QPointF>>();
+    
+    // Connect с lambda для авто-удаления watcher после завершения
+    connect(watcher, &QFutureWatcher<QList<QPointF>>::finished, this, [this, watcher]() {
+        QList<QPointF> routePoints = watcher->result();
+        watcher->deleteLater(); // Удаляем watcher
+        
+        // Уменьшаем счётчик активных расчётов
+        m_activeRouteCalculations--;
+
+        if (routePoints.size() < 2) {
+            return;
+        }
+
+        int vehicleId = ++m_vehicleCounter;
+        addVehicle(vehicleId, routePoints.first());
+        setVehicleRoute(vehicleId, routePoints);
+
+        if (Vehicle* v = m_vehicles.value(vehicleId)) {
+            v->setTrafficLightChecker([this](const QPointF& pos, qreal radius) {
+                return getTrafficLightStateAtPosition(pos, radius);
+            });
+            v->setTrafficLightAwareness(true);
+            v->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
+            v->setAcceleration(3.5);
+            v->setDeceleration(5.0);
+            
+            // Проверяем вероятность неправильной парковки при создании машины
+            if (m_wrongParkingEnabled && !v->isRouteFinished()) {
+                double randomValue = QRandomGenerator::global()->generateDouble();
+                if (randomValue < m_wrongParkingProbability) {
+                    v->setProperty("wrongParkingCandidate", true);
+                }
+            }
+        }
+
+        qDebug() << "Vehicle" << vehicleId << "spawned with route of"
+                 << routePoints.size() << "points";
+    });
+
     auto future = QtConcurrent::run([this]() {
         return calculateRouteAsync();
     });
 
-    m_routeCalculationWatcher->setFuture(future);
-}
-
-void SimulationView::onRouteCalculationFinished()
-{
-    // Уменьшаем счётчик активных расчётов
-    m_activeRouteCalculations--;
-
-    QList<QPointF> routePoints = m_routeCalculationWatcher->result();
-
-
-    if (routePoints.size() < 2) {
-        // qDebug() << "Route calculation failed";
-        return;
-    }
-
-    int vehicleId = ++m_vehicleCounter;
-    addVehicle(vehicleId, routePoints.first());
-    setVehicleRoute(vehicleId, routePoints);
-
-    if (Vehicle* v = m_vehicles.value(vehicleId)) {
-        v->setTrafficLightChecker([this](const QPointF& pos, qreal radius) {
-            return getTrafficLightStateAtPosition(pos, radius);
-        });
-        v->setTrafficLightAwareness(true);
-        v->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
-
-        v->setMaxSpeed(14.0 + QRandomGenerator::global()->bounded(4));
-        v->setAcceleration(3.5);
-        v->setDeceleration(5.0);
-        
-        // Проверяем вероятность неправильной парковки при создании машины
-        if (m_wrongParkingEnabled && !v->isRouteFinished()) {
-            double randomValue = QRandomGenerator::global()->generateDouble();
-            if (randomValue < m_wrongParkingProbability) {
-                // Помечаем машину как кандидат на неправильную парковку
-                // Фактическая парковка будет определена когда машина завершит маршрут
-                v->setProperty("wrongParkingCandidate", true);
-            }
-        }
-    }
-
-    qDebug() << "Vehicle" << vehicleId << "spawned with route of"
-             << routePoints.size() << "points";
+    watcher->setFuture(future);
 }
 
 void SimulationView::checkTrafficCongestion()
