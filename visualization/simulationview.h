@@ -18,6 +18,7 @@
 #include <QFutureWatcher>
 #include "../constants.h"
 #include "../accidentmanager.h"
+#include <QDateTime>
 
 struct PendingWay {
     QList<long long> nodeRefs;
@@ -128,6 +129,7 @@ private slots:
     void spawnVehicle();
     void onRouteCalculationFinished();
     void checkTrafficCongestion();
+    void onRouteCalculated(const QString &startId, const QString &endId, const QList<QPointF> &route);
 
 //METHODS
 private:
