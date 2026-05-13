@@ -57,7 +57,7 @@ SimulationView::SimulationView(QWidget *parent)
     setSceneRect(-100, -100, 2000, 2000);
 
     // Таймер для спавна автомобилей
-    m_vehicleSpawnTimer.setInterval(3000); // Каждые 3 секунды
+    m_vehicleSpawnTimer.setInterval(100); // Каждые 3 секунды
     connect(&m_vehicleSpawnTimer, &QTimer::timeout, this, &SimulationView::spawnVehicle);
 
 
