@@ -529,30 +529,16 @@ void SimulationView::spawnVehicle()
     if (m_isLoading || m_vehicles.size() >= 5000) return;
     if (m_roadGraph->nodeCount() < 2 || m_roadGraph->edgeCount() < 1) return;
 
-    // Если уже идёт расчёт — не блокируем, а запускаем следующий
-    // Это позволяет накапливать несколько одновременных расчётов
-    
-    const int BATCH_SIZE = 5; // Количество машин за один спавн
-    const int MAX_CONCURRENT_CALCULATIONS = 3; // Максимум параллельных расчётов
-    
-    // Проверяем, сколько сейчас активных расчётов
-    int activeCalculations = 0;
+    // Если уже идёт расчёт — пропускаем этот спавн
     if (m_routeCalculationWatcher->isRunning()) {
-        activeCalculations = 1;
+        return;
     }
-    
-    // Если меньше максимума - запускаем новый пакет расчётов
-    if (activeCalculations < MAX_CONCURRENT_CALCULATIONS) {
-        for (int i = 0; i < BATCH_SIZE; ++i) {
-            if (m_vehicles.size() >= 5000) break;
-            
-            auto future = QtConcurrent::run([this]() {
-                return calculateRouteAsync();
-            });
-            
-            m_routeCalculationWatcher->setFuture(future);
-        }
-    }
+
+    auto future = QtConcurrent::run([this]() {
+        return calculateRouteAsync();
+    });
+
+    m_routeCalculationWatcher->setFuture(future);
 }
 
 void SimulationView::onRouteCalculationFinished()
@@ -667,8 +653,7 @@ int SimulationView::getIntersectionCongestionCount() const
 
 QList<QPointF> SimulationView::calculateRouteAsync()
 {
-
-    // Получаем только узлы с соседями
+    // Получаем только узлы с соседями - делаем копию для безопасности
     QList<int> connectedIds;
     auto allNodes = m_roadGraph->getNodes().keys();
     for (int nodeId : allNodes) {

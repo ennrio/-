@@ -59,28 +59,22 @@ QList<int> RoadGraph::getNeighbors(int nodeId) const
 
 QList<int> RoadGraph::findRoute(int startNode, int endNode)
 {
-    if (!nodes.contains(startNode)) {
+    // Создаём локальные копии данных для потокобезопасности
+    QMap<int, Node> localNodes = nodes;
+    QMap<int, QList<int>> localAdjacency = adjacencyList;
+    QMap<int, Edge> localEdges = edges;
+    
+    if (!localNodes.contains(startNode)) {
         qWarning() << "RoadGraph: Start node" << startNode << "not found!";
-        qWarning() << "Available nodes:" << nodes.keys().mid(0, 10);
         return QList<int>();
     }
-    if (!nodes.contains(endNode)) {
+    if (!localNodes.contains(endNode)) {
         qWarning() << "RoadGraph: End node" << endNode << "not found!";
         return QList<int>();
     }
     if (startNode == endNode) {
         return QList<int>{ startNode };
     }
-
-
-    qDebug() << "=== findRoute: ПРЕДВАРИТЕЛЬНАЯ ПРОВЕРКА ===";
-    qDebug() << "this pointer:" << this;
-    qDebug() << "adjacencyList.size():" << adjacencyList.size();
-    qDebug() << "adjacencyList keys (first 10):" << adjacencyList.keys().mid(0, 10);
-    qDebug() << "startNode:" << startNode;
-    qDebug() << "adjacencyList[startNode]:" << adjacencyList.value(startNode);
-    qDebug() << "nodes.size():" << nodes.size();
-    qDebug() << "edges.size():" << edges.size();
 
     // Алгоритм Дейкстры
     QMap<int, double> distances;
@@ -89,8 +83,8 @@ QList<int> RoadGraph::findRoute(int startNode, int endNode)
     using NodeDist = std::pair<double, int>;
     std::priority_queue<NodeDist, std::vector<NodeDist>, std::greater<NodeDist>> pq;
 
-    // Инициализация
-    for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+    // Инициализация - теперь работаем с локальной копией
+    for (auto it = localNodes.begin(); it != localNodes.end(); ++it) {
         distances[it.key()] = std::numeric_limits<double>::infinity();
         previous[it.key()] = -1;
     }
@@ -107,11 +101,11 @@ QList<int> RoadGraph::findRoute(int startNode, int endNode)
         if (currNode == endNode) break;
         if (currDist > distances[currNode]) continue;
 
-        if (adjacencyList.contains(currNode)) {
-            for (int neighbor : adjacencyList[currNode]) {
+        if (localAdjacency.contains(currNode)) {
+            for (int neighbor : localAdjacency[currNode]) {
                 // Ищем ребро между currNode и neighbor
                 double edgeLength = -1;
-                for (const Edge& edge : edges) {
+                for (const Edge& edge : localEdges) {
                     if (edge.fromNodeId == currNode && edge.toNodeId == neighbor) {
                         edgeLength = edge.length;
                         break;
@@ -129,11 +123,8 @@ QList<int> RoadGraph::findRoute(int startNode, int endNode)
         }
     }
 
-    qInfo() << "Dijkstra visited" << visited << "nodes";
-
     // Восстановление пути
     if (previous[endNode] == -1 && startNode != endNode) {
-        qWarning() << "No path found from" << startNode << "to" << endNode;
         return QList<int>();
     }
 
@@ -142,7 +133,6 @@ QList<int> RoadGraph::findRoute(int startNode, int endNode)
         path.prepend(curr);
     }
 
-    qInfo() << "Path found:" << path.size() << "nodes, distance:" << distances[endNode];
     return path;
 }
 
