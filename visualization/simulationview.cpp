@@ -16,7 +16,6 @@
 #include <QContextMenuEvent>
 #include <qmenu.h>
 #include "trafficlightitem.h"
-#include <QOpenGLWidget>
 
 
 
